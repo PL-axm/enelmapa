@@ -1,0 +1,33 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1a2e;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.login-box{background:#16213e;padding:40px;border-radius:12px;width:380px;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.login-box h1{color:#e94560;font-size:24px;margin-bottom:6px}
+.login-box p{color:#8a8a9a;font-size:13px;margin-bottom:28px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;color:#ccc;font-size:13px;margin-bottom:6px}
+.form-group input{width:100%;padding:10px 14px;border:1px solid #2a2a4a;background:#0f3460;color:#fff;border-radius:8px;font-size:14px}
+.form-group input:focus{outline:none;border-color:#e94560}
+.btn{width:100%;padding:12px;background:#e94560;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px}
+.btn:hover{background:#c73e54}
+.error{background:#e9456020;border:1px solid #e94560;color:#e94560;padding:10px;border-radius:8px;margin-bottom:16px;font-size:13px}
+</style>
+
+<div class="login-box">
+  <h1>EnElMapa</h1>
+  <p>Panel Super Administrador</p>
+  <% if (error) { %>
+    <div class="error"><%= error %></div>
+  <% } %>
+  <form method="POST" action="/superadmin/login">
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" name="email" required>
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" name="password" required>
+    </div>
+    <button type="submit" class="btn">Entrar</button>
+  </form>
+</div>

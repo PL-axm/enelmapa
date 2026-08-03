@@ -1,0 +1,140 @@
+<%- include('../partials/admin-head', { title: 'Categorías', session }) %>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <p style="color:#6B6860"><%= categories.length %> categorías <span style="font-size:12px;color:#9C9889">— arrastra para reordenar</span></p>
+  <button class="btn btn-primary" onclick="document.getElementById('addCatModal').classList.add('open')">+ Nueva categoría</button>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  <table>
+    <thead><tr><th style="width:40px"></th><th>Nombre</th><th>Productos</th><th style="width:180px">Acciones</th></tr></thead>
+    <tbody id="catBody">
+      <% if (categories.length === 0) { %>
+        <tr><td colspan="4" style="text-align:center;color:#9C9889;padding:30px">No hay categorías</td></tr>
+      <% } else { %>
+        <% categories.forEach(c => { %>
+          <tr draggable="true" data-id="<%= c.id %>" class="drag-row">
+            <td style="cursor:grab;color:#9C9889;font-size:18px;text-align:center">⠿</td>
+            <td><%= c.name %></td>
+            <td><%= c.product_count %></td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick="editCat(<%= c.id %>, '<%= c.name.replace(/'/g,"\\'") %>')">Editar</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteCat(<%= c.id %>, '<%= c.name.replace(/'/g,"\\'") %>')">Eliminar</button>
+            </td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<div class="modal-overlay" id="addCatModal">
+  <div class="modal">
+    <h3>Nueva categoría</h3>
+    <div class="form-group">
+      <label>Nombre</label>
+      <input type="text" id="newCatName" placeholder="Ej: Bebidas Calientes">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('addCatModal').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-primary" onclick="addCat()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editCatModal">
+  <div class="modal">
+    <h3>Editar categoría</h3>
+    <div class="form-group">
+      <label>Nombre</label>
+      <input type="text" id="editCatName">
+      <input type="hidden" id="editCatId">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('editCatModal').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCat()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.drag-row { transition: background 0.15s; }
+.drag-row.dragging { opacity: 0.4; background: #F2EFEA; }
+.drag-row.drag-over { border-top: 3px solid #C8956C; }
+</style>
+
+<script>
+var dragRow = null;
+
+document.querySelectorAll('.drag-row').forEach(function(row) {
+  row.addEventListener('dragstart', function(e) {
+    dragRow = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  row.addEventListener('dragend', function() {
+    this.classList.remove('dragging');
+    document.querySelectorAll('.drag-row').forEach(function(r) { r.classList.remove('drag-over'); });
+    saveOrder();
+  });
+  row.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (this !== dragRow) {
+      document.querySelectorAll('.drag-row').forEach(function(r) { r.classList.remove('drag-over'); });
+      this.classList.add('drag-over');
+    }
+  });
+  row.addEventListener('drop', function(e) {
+    e.preventDefault();
+    if (this !== dragRow) {
+      var tbody = document.getElementById('catBody');
+      var rows = Array.from(tbody.querySelectorAll('.drag-row'));
+      var fromIdx = rows.indexOf(dragRow);
+      var toIdx = rows.indexOf(this);
+      if (fromIdx < toIdx) {
+        tbody.insertBefore(dragRow, this.nextSibling);
+      } else {
+        tbody.insertBefore(dragRow, this);
+      }
+    }
+  });
+});
+
+function saveOrder() {
+  var rows = document.querySelectorAll('.drag-row');
+  var order = [];
+  rows.forEach(function(r) { order.push(parseInt(r.dataset.id)); });
+  fetch('/api/categories/reorder', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order: order })
+  });
+}
+
+async function addCat() {
+  var name = document.getElementById('newCatName').value.trim();
+  if (!name) return;
+  await fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name}) });
+  location.reload();
+}
+function editCat(id, name) {
+  document.getElementById('editCatId').value = id;
+  document.getElementById('editCatName').value = name;
+  document.getElementById('editCatModal').classList.add('open');
+}
+async function saveCat() {
+  var id = document.getElementById('editCatId').value;
+  var name = document.getElementById('editCatName').value.trim();
+  if (!name) return;
+  await fetch('/api/categories/' + id, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name}) });
+  location.reload();
+}
+async function deleteCat(id, name) {
+  if (!confirm('Eliminar "' + name + '" y todos sus productos?')) return;
+  await fetch('/api/categories/' + id, { method: 'DELETE' });
+  location.reload();
+}
+</script>
+
+<%- include('../partials/admin-foot') %>

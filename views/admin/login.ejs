@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - EnElMapa</title>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #F2EFEA; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-box { background: #fff; padding: 40px 32px; border-radius: 12px; box-shadow: 0 4px 12px rgba(26,26,24,0.08); width: 100%; max-width: 380px; margin: 20px; }
+  h1 { font-size: 22px; margin-bottom: 4px; color: #1A1A18; }
+  .sub { color: #6B6860; font-size: 14px; margin-bottom: 28px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #6B6860; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  input[type="email"], input[type="password"] { width: 100%; padding: 10px 14px; border: 1px solid #E8E5DE; border-radius: 8px; font-family: inherit; font-size: 14px; margin-bottom: 18px; outline: none; transition: border-color 0.2s; box-sizing: border-box; }
+  input:focus { border-color: #C8956C; }
+  .btn { width: 100%; padding: 12px; background: #C8956C; color: #fff; border: none; border-radius: 8px; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  .btn:hover { background: #b8845c; }
+  .error { background: #FEE; color: #C0392B; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 18px; }
+  .back { display: block; text-align: center; margin-top: 20px; color: #9C9889; font-size: 13px; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="login-box">
+  <h1>🗺️ EnElMapa</h1>
+  <p class="sub">Panel de administración</p>
+  <% if (error) { %><div class="error"><%= error %></div><% } %>
+  <form method="POST" action="/admin/login">
+    <label>Correo electrónico</label>
+    <input type="email" name="email" required autofocus>
+    <label>Contraseña</label>
+    <input type="password" name="password" required>
+    <button type="submit" class="btn">Ingresar</button>
+  </form>
+  <a class="back" href="/">← Volver al inicio</a>
+</div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<%- include('../partials/admin-head', { title: 'Código QR', session }) %>
+
+<div class="card" style="text-align:center;max-width:500px;margin:0 auto">
+  <h3>Código QR de tu menú</h3>
+  <p style="color:#6B6860;font-size:14px;margin-bottom:20px">
+    Imprime este código y colócalo en las mesas de tu negocio.<br>
+    Tus clientes lo escanean y ven el menú directamente.
+  </p>
+
+  <div style="background:#fff;border:3px solid #E8E5DE;border-radius:16px;padding:20px;margin:0 auto 20px;max-width:340px;width:100%;box-sizing:border-box">
+    <img id="qrImage" src="<%= qrDataUrl %>" alt="QR Code" style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto">
+    <div style="margin-top:14px;font-size:18px;font-weight:700;color:#1A1A18"><%= business.name %></div>
+    <div style="margin-top:4px;font-size:13px;color:#C8956C;font-weight:600"><%= menuUrl.replace('https://','') %></div>
+  </div>
+
+  <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+    <a id="downloadBtn" download="qr-<%= business.slug %>.png" class="btn btn-primary" style="text-decoration:none">Descargar PNG</a>
+    <button onclick="window.print()" class="btn btn-secondary">Imprimir</button>
+  </div>
+</div>
+
+<div class="card" style="max-width:500px;margin:20px auto">
+  <h3>Personalizar tamaño</h3>
+  <div class="form-group">
+    <label>Tamaño del QR (px)</label>
+    <select id="qrSize" style="width:auto;padding:8px 12px">
+      <option value="200">Pequeño (200px)</option>
+      <option value="300" selected>Mediano (300px)</option>
+      <option value="400">Grande (400px)</option>
+      <option value="600">Extra grande (600px)</option>
+    </select>
+  </div>
+  <button class="btn btn-secondary" onclick="regenerateQR()">Regenerar</button>
+</div>
+
+<style>
+@media print {
+  .sidebar, .topbar, .card:last-child, .btn { display: none !important; }
+  .main { margin-left: 0 !important; }
+  .content { padding: 0 !important; }
+  .card:first-child { border: none !important; box-shadow: none !important; }
+}
+</style>
+
+<script>
+var currentUrl = '<%= menuUrl %>';
+var slug = '<%= business.slug %>';
+
+document.getElementById('downloadBtn').href = document.getElementById('qrImage').src;
+
+function regenerateQR() {
+  var size = document.getElementById('qrSize').value;
+  fetch('/api/qr?size=' + size)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('qrImage').src = data.qr;
+      document.getElementById('downloadBtn').href = data.qr;
+    });
+}
+</script>
+
+<%- include('../partials/admin-foot') %>

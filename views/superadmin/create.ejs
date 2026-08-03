@@ -1,0 +1,103 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}
+.topbar{background:#16213e;padding:16px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2a4a}
+.topbar h1{color:#e94560;font-size:20px}
+.topbar a{color:#8a8a9a;text-decoration:none;font-size:13px}
+.topbar a:hover{color:#e94560}
+.container{max-width:700px;margin:30px auto;padding:0 20px}
+.card{background:#16213e;border-radius:10px;padding:28px;margin-bottom:20px}
+.card h2{font-size:16px;color:#e94560;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid #2a2a4a}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;color:#ccc;font-size:13px;margin-bottom:6px;font-weight:500}
+.form-group input{width:100%;padding:10px 14px;border:1px solid #2a2a4a;background:#0f3460;color:#fff;border-radius:8px;font-size:14px}
+.form-group input:focus{outline:none;border-color:#e94560}
+.form-group small{color:#8a8a9a;font-size:11px;margin-top:4px;display:block}
+.btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+.btn-primary{background:#e94560;color:#fff}
+.btn-primary:hover{background:#c73e54}
+.btn-secondary{background:#2a2a4a;color:#ccc}
+.actions{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}
+.error{background:#e9456020;border:1px solid #e94560;color:#e94560;padding:10px;border-radius:8px;margin-bottom:16px;font-size:13px}
+</style>
+
+<div class="topbar">
+  <h1>EnElMapa — Nuevo negocio</h1>
+  <a href="/superadmin">← Volver</a>
+</div>
+
+<div class="container">
+  <% if (error) { %>
+    <div class="error"><%= error %></div>
+  <% } %>
+
+  <form method="POST" action="/superadmin/create">
+    <div class="card">
+      <h2>Datos del negocio</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre del negocio *</label>
+          <input type="text" name="name" required placeholder="Mi Restaurante">
+        </div>
+        <div class="form-group">
+          <label>Slug (URL) *</label>
+          <input type="text" name="slug" required placeholder="mi-restaurante" pattern="[a-z0-9\-]+" title="Solo letras minúsculas, números y guiones">
+          <small>Se accederá como: <strong>slug.enelmapa.co</strong></small>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Dirección</label>
+        <input type="text" name="address" placeholder="Calle 10 #5-20, Ciudad">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Teléfono</label>
+          <input type="text" name="phone" placeholder="+57 300 123 4567">
+        </div>
+        <div class="form-group">
+          <label>WhatsApp (sin +)</label>
+          <input type="text" name="whatsapp" placeholder="573001234567">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Instagram</label>
+          <input type="text" name="instagram" placeholder="usuario">
+        </div>
+        <div class="form-group">
+          <label>Facebook</label>
+          <input type="text" name="facebook" placeholder="usuario">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>TikTok</label>
+        <input type="text" name="tiktok" placeholder="usuario">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Credenciales del administrador</h2>
+      <div class="form-group">
+        <label>Nombre del admin</label>
+        <input type="text" name="admin_name" placeholder="Juan Pérez">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Email del admin *</label>
+          <input type="email" name="admin_email" required placeholder="admin@negocio.com">
+        </div>
+        <div class="form-group">
+          <label>Contraseña *</label>
+          <input type="text" name="admin_password" required placeholder="contraseña123">
+          <small>Se le enviará al cliente para que acceda</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="/superadmin" class="btn btn-secondary">Cancelar</a>
+      <button type="submit" class="btn btn-primary">Crear negocio</button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,149 @@
+<%- include('../partials/admin-head', { title: 'Configuración', session }) %>
+
+<div id="saveAlert" class="alert alert-success" style="display:none">Cambios guardados correctamente</div>
+
+<form id="settingsForm" enctype="multipart/form-data">
+<div class="card">
+  <h3>Información general</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="form-group">
+      <label>Nombre del negocio</label>
+      <input type="text" name="name" value="<%= business.name %>" required>
+    </div>
+    <div class="form-group">
+      <label>Dirección</label>
+      <input type="text" name="address" value="<%= business.address %>">
+    </div>
+    <div class="form-group">
+      <label>Teléfono</label>
+      <input type="text" name="phone" value="<%= business.phone %>">
+    </div>
+    <div class="form-group">
+      <label>WhatsApp (sin +)</label>
+      <input type="text" name="whatsapp" value="<%= business.whatsapp %>" placeholder="573001234567">
+    </div>
+    <div class="form-group">
+      <label>Instagram (usuario)</label>
+      <input type="text" name="instagram" value="<%= business.instagram %>" placeholder="mi_negocio">
+    </div>
+    <div class="form-group">
+      <label>Facebook (usuario)</label>
+      <input type="text" name="facebook" value="<%= business.facebook %>" placeholder="mi_negocio">
+    </div>
+    <div class="form-group">
+      <label>TikTok (usuario)</label>
+      <input type="text" name="tiktok" value="<%= business.tiktok || '' %>">
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:10px;margin-top:22px">
+        ¿Está abierto?
+        <label class="toggle"><input type="checkbox" name="is_open" <%= business.is_open ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Tema del menú</h3>
+  <p style="font-size:13px;color:#6B6860;margin-bottom:16px">Elige el color de fondo de tu menú digital</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <label style="cursor:pointer;text-align:center">
+      <input type="radio" name="menu_theme" value="light" <%= (business.menu_theme || 'light') === 'light' ? 'checked' : '' %> style="display:none">
+      <div class="theme-option" style="background:#FAFAF7;color:#1A1A18;border:3px solid <%= (business.menu_theme || 'light') === 'light' ? '#C8956C' : '#E8E5DE' %>">Aa</div>
+      <span style="font-size:12px;color:#6B6860">Blanco</span>
+    </label>
+    <label style="cursor:pointer;text-align:center">
+      <input type="radio" name="menu_theme" value="dark" <%= business.menu_theme === 'dark' ? 'checked' : '' %> style="display:none">
+      <div class="theme-option" style="background:#1A1917;color:#F0EDE6;border:3px solid <%= business.menu_theme === 'dark' ? '#C8956C' : '#333' %>">Aa</div>
+      <span style="font-size:12px;color:#6B6860">Oscuro</span>
+    </label>
+    <label style="cursor:pointer;text-align:center">
+      <input type="radio" name="menu_theme" value="cream" <%= business.menu_theme === 'cream' ? 'checked' : '' %> style="display:none">
+      <div class="theme-option" style="background:#F5F0E8;color:#3D3426;border:3px solid <%= business.menu_theme === 'cream' ? '#C8956C' : '#E8E5DE' %>">Aa</div>
+      <span style="font-size:12px;color:#6B6860">Crema</span>
+    </label>
+    <label style="cursor:pointer;text-align:center">
+      <input type="radio" name="menu_theme" value="green" <%= business.menu_theme === 'green' ? 'checked' : '' %> style="display:none">
+      <div class="theme-option" style="background:#1B2E1B;color:#D4E6D4;border:3px solid <%= business.menu_theme === 'green' ? '#C8956C' : '#333' %>">Aa</div>
+      <span style="font-size:12px;color:#6B6860">Verde</span>
+    </label>
+    <label style="cursor:pointer;text-align:center">
+      <input type="radio" name="menu_theme" value="navy" <%= business.menu_theme === 'navy' ? 'checked' : '' %> style="display:none">
+      <div class="theme-option" style="background:#1a1a2e;color:#e0e0e0;border:3px solid <%= business.menu_theme === 'navy' ? '#C8956C' : '#333' %>">Aa</div>
+      <span style="font-size:12px;color:#6B6860">Azul</span>
+    </label>
+  </div>
+  <style>.theme-option{width:60px;height:60px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;margin-bottom:4px;transition:border-color .2s;}</style>
+  <script>document.querySelectorAll('input[name="menu_theme"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.theme-option').forEach(function(d){d.style.borderColor='#E8E5DE'});this.parentElement.querySelector('.theme-option').style.borderColor='#C8956C'})});</script>
+</div>
+
+<div class="card">
+  <h3>Imágenes</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div class="form-group">
+      <label>Banner</label>
+      <input type="file" name="banner" accept="image/*">
+      <% if (business.banner_img) { %>
+        <img src="<%= business.banner_img %>" class="img-preview" style="width:100%;height:100px">
+      <% } %>
+    </div>
+    <div class="form-group">
+      <label>Logo</label>
+      <input type="file" name="logo" accept="image/*">
+      <% if (business.logo_img) { %>
+        <img src="<%= business.logo_img %>" class="img-preview" style="width:80px;height:80px">
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Horarios de atención</h3>
+  <div style="display:grid;grid-template-columns:100px 1fr 1fr auto;gap:10px;padding-bottom:8px;border-bottom:2px solid #E8E5DE">
+    <span style="font-size:12px;font-weight:600;color:#9C9889">DÍA</span>
+    <span style="font-size:12px;font-weight:600;color:#9C9889">APERTURA</span>
+    <span style="font-size:12px;font-weight:600;color:#9C9889">CIERRE</span>
+    <span style="font-size:12px;font-weight:600;color:#9C9889">CERRADO</span>
+  </div>
+  <% hours.forEach(h => { %>
+    <div style="display:grid;grid-template-columns:100px 1fr 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #E8E5DE">
+      <span style="font-size:14px"><%= h.day_name %></span>
+      <input type="time" class="hour-open" data-day="<%= h.day_index %>" value="<%= h.open_time %>" style="padding:6px 8px;border:1px solid #E8E5DE;border-radius:6px;font-size:13px">
+      <input type="time" class="hour-close" data-day="<%= h.day_index %>" value="<%= h.close_time %>" style="padding:6px 8px;border:1px solid #E8E5DE;border-radius:6px;font-size:13px">
+      <label class="toggle"><input type="checkbox" class="hour-closed" data-day="<%= h.day_index %>" <%= h.is_closed ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+    </div>
+  <% }) %>
+</div>
+
+<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px">
+  <a href="/s/<%= session.businessSlug %>" target="_blank" class="btn btn-secondary">Ver menú</a>
+  <button type="submit" class="btn btn-primary">Guardar cambios</button>
+</div>
+</form>
+
+<script>
+document.getElementById('settingsForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var fd = new FormData(this);
+
+  var hoursData = [];
+  document.querySelectorAll('.hour-open').forEach(function(el) {
+    var day = parseInt(el.dataset.day);
+    hoursData.push({
+      day_index: day,
+      open_time: el.value,
+      close_time: document.querySelector('.hour-close[data-day="' + day + '"]').value,
+      is_closed: document.querySelector('.hour-closed[data-day="' + day + '"]').checked
+    });
+  });
+  fd.append('hours', JSON.stringify(hoursData));
+
+  var res = await fetch('/api/settings', { method: 'POST', body: fd });
+  if (res.ok) {
+    document.getElementById('saveAlert').style.display = '';
+    setTimeout(function() { document.getElementById('saveAlert').style.display = 'none'; }, 3000);
+  }
+});
+</script>
+
+<%- include('../partials/admin-foot') %>

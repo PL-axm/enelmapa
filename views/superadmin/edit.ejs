@@ -1,0 +1,123 @@
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}
+.topbar{background:#16213e;padding:16px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2a4a}
+.topbar h1{color:#e94560;font-size:20px}
+.topbar a{color:#8a8a9a;text-decoration:none;font-size:13px}
+.topbar a:hover{color:#e94560}
+.container{max-width:700px;margin:30px auto;padding:0 20px}
+.card{background:#16213e;border-radius:10px;padding:28px;margin-bottom:20px}
+.card h2{font-size:16px;color:#e94560;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid #2a2a4a}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;color:#ccc;font-size:13px;margin-bottom:6px;font-weight:500}
+.form-group input{width:100%;padding:10px 14px;border:1px solid #2a2a4a;background:#0f3460;color:#fff;border-radius:8px;font-size:14px}
+.form-group input:focus{outline:none;border-color:#e94560}
+.form-group small{color:#8a8a9a;font-size:11px;margin-top:4px;display:block}
+.toggle-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.toggle{position:relative;width:44px;height:24px}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#2a2a4a;border-radius:24px;transition:.3s}
+.toggle-slider:before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.toggle input:checked+.toggle-slider{background:#e94560}
+.toggle input:checked+.toggle-slider:before{transform:translateX(20px)}
+.btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+.btn-primary{background:#e94560;color:#fff}
+.btn-primary:hover{background:#c73e54}
+.btn-secondary{background:#2a2a4a;color:#ccc}
+.btn-danger{background:#dc3545;color:#fff}
+.btn-sm{padding:6px 14px;font-size:12px}
+.actions{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}
+.user-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #2a2a4a}
+.user-row:last-child{border-bottom:none}
+.user-email{color:#ccc;font-size:14px}
+.reset-form{display:flex;gap:8px;align-items:center}
+.reset-form input{width:160px;padding:6px 10px;font-size:12px}
+.delete-zone{background:#dc354510;border:1px solid #dc354540;border-radius:10px;padding:20px;margin-top:20px;text-align:center}
+.delete-zone p{color:#dc3545;font-size:13px;margin-bottom:12px}
+</style>
+
+<div class="topbar">
+  <h1>Editar — <%= business.name %></h1>
+  <a href="/superadmin">← Volver</a>
+</div>
+
+<div class="container">
+  <form method="POST" action="/superadmin/edit/<%= business.id %>">
+    <div class="card">
+      <h2>Datos del negocio</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" name="name" value="<%= business.name %>" required>
+        </div>
+        <div class="form-group">
+          <label>Slug</label>
+          <input type="text" name="slug" value="<%= business.slug %>" required pattern="[a-z0-9\-]+">
+          <small><%= business.slug %>.enelmapa.co</small>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Dirección</label>
+        <input type="text" name="address" value="<%= business.address %>">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Teléfono</label>
+          <input type="text" name="phone" value="<%= business.phone %>">
+        </div>
+        <div class="form-group">
+          <label>WhatsApp</label>
+          <input type="text" name="whatsapp" value="<%= business.whatsapp %>">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Instagram</label>
+          <input type="text" name="instagram" value="<%= business.instagram %>">
+        </div>
+        <div class="form-group">
+          <label>Facebook</label>
+          <input type="text" name="facebook" value="<%= business.facebook %>">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>TikTok</label>
+        <input type="text" name="tiktok" value="<%= business.tiktok || '' %>">
+      </div>
+      <div class="toggle-row">
+        <span>Estado:</span>
+        <label class="toggle">
+          <input type="checkbox" name="is_open" <%= business.is_open ? 'checked' : '' %>>
+          <span class="toggle-slider"></span>
+        </label>
+        <span style="font-size:13px;color:#8a8a9a"><%= business.is_open ? 'Abierto' : 'Cerrado' %></span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="/superadmin" class="btn btn-secondary">Cancelar</a>
+      <button type="submit" class="btn btn-primary">Guardar cambios</button>
+    </div>
+  </form>
+
+  <div class="card">
+    <h2>Usuarios administradores</h2>
+    <% users.forEach(u => { %>
+      <div class="user-row">
+        <span class="user-email"><%= u.email %> <span style="color:#8a8a9a;font-size:12px">(<%= u.name %>)</span></span>
+        <form method="POST" action="/superadmin/reset-password/<%= u.id %>" class="reset-form">
+          <input type="text" name="new_password" placeholder="Nueva contraseña" required>
+          <button type="submit" class="btn btn-secondary btn-sm">Cambiar</button>
+        </form>
+      </div>
+    <% }) %>
+  </div>
+
+  <div class="delete-zone">
+    <p>Eliminar este negocio y todos sus datos permanentemente</p>
+    <form method="POST" action="/superadmin/delete/<%= business.id %>" onsubmit="return confirm('¿Estás seguro de eliminar <%= business.name %>? Esta acción no se puede deshacer.')">
+      <button type="submit" class="btn btn-danger">Eliminar negocio</button>
+    </form>
+  </div>
+</div>

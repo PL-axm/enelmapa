@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnElMapa - Menús Digitales</title>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #FAFAF7; color: #1A1A18; margin: 0; padding: 40px 20px; }
+  .container { max-width: 600px; margin: 0 auto; }
+  h1 { font-size: 28px; margin-bottom: 8px; }
+  .sub { color: #6B6860; margin-bottom: 32px; }
+  .biz-list { display: flex; flex-direction: column; gap: 12px; }
+  .biz-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: #fff; border-radius: 10px; border: 1px solid #E8E5DE; text-decoration: none; color: inherit; transition: box-shadow 0.2s; }
+  .biz-card:hover { box-shadow: 0 4px 12px rgba(26,26,24,0.08); }
+  .biz-logo { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: #F2EFEA; }
+  .biz-name { font-weight: 600; font-size: 16px; }
+  .biz-slug { font-size: 13px; color: #9C9889; }
+  .empty { color: #9C9889; text-align: center; padding: 40px 0; }
+  .admin-link { display: inline-block; margin-top: 24px; color: #C8956C; text-decoration: none; font-weight: 500; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🗺️ EnElMapa</h1>
+  <p class="sub">Plataforma de menús digitales</p>
+  <% if (businesses.length === 0) { %>
+    <p class="empty">No hay negocios registrados aún.</p>
+  <% } else { %>
+    <div class="biz-list">
+      <% businesses.forEach(b => { %>
+        <a class="biz-card" href="/s/<%= b.slug %>">
+          <% if (b.logo_img) { %><img class="biz-logo" src="<%= b.logo_img %>" alt=""><% } else { %><div class="biz-logo"></div><% } %>
+          <div>
+            <div class="biz-name"><%= b.name %></div>
+            <div class="biz-slug"><%= b.slug %>.enelmapa.co</div>
+          </div>
+        </a>
+      <% }) %>
+    </div>
+  <% } %>
+  <a class="admin-link" href="/admin/login">Panel de administración →</a>
+</div>
+</body>
+</html>

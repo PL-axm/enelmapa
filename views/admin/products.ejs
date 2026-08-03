@@ -1,0 +1,202 @@
+<%- include('../partials/admin-head', { title: 'Productos', session }) %>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <p style="color:#6B6860"><%= products.length %> productos <span style="font-size:12px;color:#9C9889">— arrastra para reordenar</span></p>
+  <button class="btn btn-primary" onclick="openAddProd()">+ Nuevo producto</button>
+</div>
+
+<div class="card" style="padding:0;overflow-x:auto">
+  <table>
+    <thead><tr><th style="width:30px"></th><th style="width:50px"></th><th>Producto</th><th>Categoría</th><th>Precio</th><th style="width:160px">Acciones</th></tr></thead>
+    <tbody id="prodBody">
+      <% if (products.length === 0) { %>
+        <tr><td colspan="6" style="text-align:center;color:#9C9889;padding:30px">No hay productos</td></tr>
+      <% } else { %>
+        <% products.forEach(p => { %>
+          <tr draggable="true" data-id="<%= p.id %>" class="drag-row">
+            <td style="cursor:grab;color:#9C9889;font-size:18px;text-align:center">⠿</td>
+            <td>
+              <% if (p.image) { %>
+                <img class="img-thumb" src="<%= p.image %>">
+              <% } else { %>
+                <div class="img-thumb"></div>
+              <% } %>
+            </td>
+            <td><strong><%= p.name %></strong><br><span style="font-size:12px;color:#9C9889"><%= p.description || '' %></span></td>
+            <td><%= p.category_name %></td>
+            <td style="font-weight:600;color:#C8956C">$ <%= Math.round(p.price).toLocaleString('es-CO') %></td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick='editProd(<%- JSON.stringify({id:p.id,name:p.name,description:p.description||"",price:p.price,category_id:p.category_id,image:p.image||"",is_active:p.is_active}) %>)'>Editar</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteProd(<%= p.id %>, '<%= p.name.replace(/'/g,"\\'") %>')">Eliminar</button>
+            </td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<div class="modal-overlay" id="prodModal">
+  <div class="modal">
+    <h3 id="prodModalTitle">Nuevo producto</h3>
+    <form id="prodForm" enctype="multipart/form-data">
+      <input type="hidden" id="prodId">
+      <div class="form-group">
+        <label>Categoría</label>
+        <select id="prodCat" required>
+          <% categories.forEach(c => { %>
+            <option value="<%= c.id %>"><%= c.name %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nombre</label>
+        <input type="text" id="prodName" required>
+      </div>
+      <div class="form-group">
+        <label>Descripción</label>
+        <textarea id="prodDesc"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Precio (COP)</label>
+        <input type="number" id="prodPrice" required min="0">
+      </div>
+      <div class="form-group">
+        <label>Imagen</label>
+        <input type="file" id="prodImage" accept="image/*">
+        <img id="prodImgPreview" class="img-preview" style="display:none">
+      </div>
+      <div class="form-group" id="prodActiveGroup" style="display:none">
+        <label style="display:flex;align-items:center;gap:10px">
+          Activo
+          <label class="toggle"><input type="checkbox" id="prodActive" checked><span class="toggle-slider"></span></label>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('prodModal').classList.remove('open')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.drag-row { transition: background 0.15s; }
+.drag-row.dragging { opacity: 0.4; background: #F2EFEA; }
+.drag-row.drag-over { border-top: 3px solid #C8956C; }
+</style>
+
+<script>
+var dragRow = null;
+
+document.querySelectorAll('.drag-row').forEach(function(row) {
+  row.addEventListener('dragstart', function(e) {
+    dragRow = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  row.addEventListener('dragend', function() {
+    this.classList.remove('dragging');
+    document.querySelectorAll('.drag-row').forEach(function(r) { r.classList.remove('drag-over'); });
+    saveProdOrder();
+  });
+  row.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (this !== dragRow) {
+      document.querySelectorAll('.drag-row').forEach(function(r) { r.classList.remove('drag-over'); });
+      this.classList.add('drag-over');
+    }
+  });
+  row.addEventListener('drop', function(e) {
+    e.preventDefault();
+    if (this !== dragRow) {
+      var tbody = document.getElementById('prodBody');
+      var rows = Array.from(tbody.querySelectorAll('.drag-row'));
+      var fromIdx = rows.indexOf(dragRow);
+      var toIdx = rows.indexOf(this);
+      if (fromIdx < toIdx) {
+        tbody.insertBefore(dragRow, this.nextSibling);
+      } else {
+        tbody.insertBefore(dragRow, this);
+      }
+    }
+  });
+});
+
+function saveProdOrder() {
+  var rows = document.querySelectorAll('.drag-row');
+  var order = [];
+  rows.forEach(function(r) { order.push(parseInt(r.dataset.id)); });
+  fetch('/api/products/reorder', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order: order })
+  });
+}
+
+function openAddProd() {
+  document.getElementById('prodModalTitle').textContent = 'Nuevo producto';
+  document.getElementById('prodId').value = '';
+  document.getElementById('prodName').value = '';
+  document.getElementById('prodDesc').value = '';
+  document.getElementById('prodPrice').value = '';
+  document.getElementById('prodCat').selectedIndex = 0;
+  document.getElementById('prodImgPreview').style.display = 'none';
+  document.getElementById('prodActiveGroup').style.display = 'none';
+  document.getElementById('prodModal').classList.add('open');
+}
+
+function editProd(p) {
+  document.getElementById('prodModalTitle').textContent = 'Editar producto';
+  document.getElementById('prodId').value = p.id;
+  document.getElementById('prodName').value = p.name;
+  document.getElementById('prodDesc').value = p.description || '';
+  document.getElementById('prodPrice').value = p.price;
+  document.getElementById('prodCat').value = p.category_id;
+  document.getElementById('prodActive').checked = p.is_active === 1;
+  document.getElementById('prodActiveGroup').style.display = '';
+  if (p.image) {
+    document.getElementById('prodImgPreview').src = p.image;
+    document.getElementById('prodImgPreview').style.display = '';
+  } else {
+    document.getElementById('prodImgPreview').style.display = 'none';
+  }
+  document.getElementById('prodModal').classList.add('open');
+}
+
+document.getElementById('prodForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var id = document.getElementById('prodId').value;
+  var fd = new FormData();
+  fd.append('name', document.getElementById('prodName').value);
+  fd.append('description', document.getElementById('prodDesc').value);
+  fd.append('price', document.getElementById('prodPrice').value);
+  fd.append('category_id', document.getElementById('prodCat').value);
+  if (id) fd.append('is_active', document.getElementById('prodActive').checked ? '1' : '0');
+  var file = document.getElementById('prodImage').files[0];
+  if (file) fd.append('image', file);
+
+  var url = id ? '/api/products/' + id : '/api/products';
+  var method = id ? 'PUT' : 'POST';
+  await fetch(url, { method: method, body: fd });
+  location.reload();
+});
+
+async function deleteProd(id, name) {
+  if (!confirm('Eliminar "' + name + '"?')) return;
+  await fetch('/api/products/' + id, { method: 'DELETE' });
+  location.reload();
+}
+
+document.getElementById('prodImage').addEventListener('change', function() {
+  var file = this.files[0];
+  if (file) {
+    var preview = document.getElementById('prodImgPreview');
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = '';
+  }
+});
+</script>
+
+<%- include('../partials/admin-foot') %>

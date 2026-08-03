@@ -1,0 +1,40 @@
+<%- include('../partials/admin-head', { title: 'Dashboard', session }) %>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-num"><%= stats.categories %></div>
+    <div class="stat-label">Categorías</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num"><%= stats.products %></div>
+    <div class="stat-label">Productos</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num"><%= business.is_open ? '✅' : '🔴' %></div>
+    <div class="stat-label"><%= business.is_open ? 'Abierto' : 'Cerrado' %></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Accesos rápidos</h3>
+  <p style="margin-bottom:12px">
+    <a href="/s/<%= business.slug %>" target="_blank" style="color:#C8956C;font-weight:600;text-decoration:none">
+      🔗 Ver menú público → /s/<%= business.slug %>
+    </a>
+  </p>
+  <p style="font-size:13px;color:#6B6860">
+    En producción tu menú estará en: <strong><%= business.slug %>.enelmapa.co</strong>
+  </p>
+</div>
+
+<div class="card">
+  <h3>Información del negocio</h3>
+  <table>
+    <tr><td style="font-weight:600;width:120px">Nombre</td><td><%= business.name %></td></tr>
+    <tr><td style="font-weight:600">Dirección</td><td><%= business.address %></td></tr>
+    <tr><td style="font-weight:600">WhatsApp</td><td><%= business.whatsapp || '—' %></td></tr>
+    <tr><td style="font-weight:600">Instagram</td><td><%= business.instagram || '—' %></td></tr>
+  </table>
+</div>
+
+<%- include('../partials/admin-foot') %>

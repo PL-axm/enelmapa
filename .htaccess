@@ -1,0 +1,6 @@
+DirectoryIndex disabled
+
+RewriteEngine On
+
+# Redirigir todo el tráfico al servidor Node.js de Passenger
+RewriteRule ^(.*)$ http://127.0.0.1:%{ENV:PASSENGER_BASE_PORT}/$1 [P,L]

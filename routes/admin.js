@@ -1,0 +1,95 @@
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const { getPool } = require('../db/schema');
+const authRequired = require('../middleware/auth');
+
+router.get('/login', (req, res) => {
+  res.render('admin/login', { error: null });
+});
+
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  const db = getPool();
+  const [users] = await db.query('SELECT u.*, b.name as business_name, b.slug FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.email = ?', [email]);
+
+  if (users.length === 0 || !bcrypt.compareSync(password, users[0].password_hash)) {
+    return res.render('admin/login', { error: 'Credenciales incorrectas' });
+  }
+
+  const user = users[0];
+  req.session.userId = user.id;
+  req.session.businessId = user.business_id;
+  req.session.userName = user.name;
+  req.session.businessName = user.business_name;
+  req.session.businessSlug = user.slug;
+
+  res.redirect('/admin/dashboard');
+});
+
+router.get('/logout', (req, res) => {
+  req.session.destroy();
+  res.redirect('/admin/login');
+});
+
+router.get('/dashboard', authRequired, async (req, res) => {
+  const db = getPool();
+  const [businesses] = await db.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
+  const [catRows] = await db.query('SELECT COUNT(*) as count FROM categories WHERE business_id = ?', [req.session.businessId]);
+  const [prodRows] = await db.query('SELECT COUNT(*) as count FROM products WHERE business_id = ?', [req.session.businessId]);
+
+  res.render('admin/dashboard', {
+    session: req.session,
+    business: businesses[0],
+    stats: { categories: catRows[0].count, products: prodRows[0].count }
+  });
+});
+
+router.get('/settings', authRequired, async (req, res) => {
+  const db = getPool();
+  const [businesses] = await db.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
+  const [hours] = await db.query('SELECT * FROM business_hours WHERE business_id = ? ORDER BY day_index', [req.session.businessId]);
+
+  res.render('admin/settings', { session: req.session, business: businesses[0], hours });
+});
+
+router.get('/categories', authRequired, async (req, res) => {
+  const db = getPool();
+  const [categories] = await db.query(`
+    SELECT c.*, COUNT(p.id) as product_count
+    FROM categories c
+    LEFT JOIN products p ON p.category_id = c.id
+    WHERE c.business_id = ?
+    GROUP BY c.id
+    ORDER BY c.sort_order
+  `, [req.session.businessId]);
+
+  res.render('admin/categories', { session: req.session, categories });
+});
+
+router.get('/products', authRequired, async (req, res) => {
+  const db = getPool();
+  const [categories] = await db.query('SELECT * FROM categories WHERE business_id = ? ORDER BY sort_order', [req.session.businessId]);
+  const [products] = await db.query(`
+    SELECT p.*, c.name as category_name
+    FROM products p
+    JOIN categories c ON p.category_id = c.id
+    WHERE p.business_id = ?
+    ORDER BY c.sort_order, p.sort_order
+  `, [req.session.businessId]);
+
+  res.render('admin/products', { session: req.session, categories, products });
+});
+
+router.get('/qr', authRequired, async (req, res) => {
+  const QRCode = require('qrcode');
+  const db = getPool();
+  const [businesses] = await db.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
+  const business = businesses[0];
+  const domain = process.env.DOMAIN || 'enelmapa.co';
+  const menuUrl = 'https://' + domain + '/s/' + business.slug;
+  const qrDataUrl = await QRCode.toDataURL(menuUrl, { width: 300, margin: 2, color: { dark: '#1A1A18', light: '#FFFFFF' } });
+  res.render('admin/qr', { session: req.session, business, menuUrl, qrDataUrl });
+});
+
+module.exports = router;
