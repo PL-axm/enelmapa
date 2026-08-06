@@ -21,10 +21,9 @@ igual que en la máquina original, ajustado a la ruta real de este checkout.
 ## Contenido
 
 - `MEMORY.md` — índice original.
-- `enelmapa_project_structure.md` — cómo estaba organizado el proyecto en la
-  máquina original (wrapper `menumap/` + `enelmapa/` adentro). Si acá
-  clonaste `enelmapa` directo sin ese wrapper, la estructura real es distinta
-  — usar esto como contexto histórico, no como instrucción literal.
+- `enelmapa_project_structure.md` — confirma que este repo es la única
+  fuente de verdad (no hay duplicados fuera de acá) y por qué existen los dos
+  skills por separado.
 - `enelmapa_github_repo.md` — referencia al repo.
 - `skill_building_philosophy.md` — cómo se decidió crear skills en este
   proyecto (desde patrones repetidos) y la preferencia de definir workflows

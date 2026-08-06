@@ -5,13 +5,11 @@ description: Trabajar en el código fuente de la app EnElMapa (Node.js + Express
 
 # Desarrollo sobre el código de EnElMapa
 
-> Esta copia vive dentro del propio repo (`.claude/skills/enelmapa-dev/`) para
-> que cualquier máquina que clone `enelmapa` tenga el mismo contexto. La
-> copia "canónica" original se armó en un proyecto wrapper local
-> (`menumap/`) que además contiene `cargar-menu-pdf` y
-> `PROCEDIMIENTO_CARGA_MENU.md` — si trabajas desde ese wrapper, esos archivos
-> son la fuente de verdad; si sólo tienes este repo clonado, esta copia y la
-> de `cargar-menu-pdf` (también en `.claude/skills/` acá) son autosuficientes.
+> Esta es la **única** copia — vive dentro del propio repo
+> (`.claude/skills/enelmapa-dev/`) para que cualquier máquina que clone
+> `enelmapa` tenga el mismo contexto automáticamente, sin setup aparte. No
+> hay otra copia en un wrapper externo; si alguna vez aparece una duplicada
+> fuera de este repo, es una desviación y esta es la fuente de verdad.
 
 ## Antes de arrancar cualquier tarea nueva en este proyecto
 
