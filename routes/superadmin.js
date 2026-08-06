@@ -3,9 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { getPool } = require('../db/schema');
 const superRequired = require('../middleware/superauth');
-
-const SUPER_EMAIL = process.env.SUPER_EMAIL || 'admin@enelmapa.co';
-const SUPER_PASS = process.env.SUPER_PASS || 'super2026';
+const { verifySuperadmin } = require('../services/superadminAuth');
 
 router.get('/login', (req, res) => {
   res.render('superadmin/login', { error: null });
@@ -13,7 +11,7 @@ router.get('/login', (req, res) => {
 
 router.post('/login', (req, res) => {
   const { email, password } = req.body;
-  if (email === SUPER_EMAIL && password === SUPER_PASS) {
+  if (verifySuperadmin({ email, password })) {
     req.session.isSuper = true;
     return res.redirect('/superadmin');
   }

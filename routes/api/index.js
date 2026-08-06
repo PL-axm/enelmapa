@@ -19,6 +19,36 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
+// Un :id no numérico llega tal cual al SQL (`WHERE id = 'abc'`) y MySQL
+// responde ER_TRUNCATED_WRONG_VALUE. Sin error-handler central eso es una
+// unhandled rejection que mata el proceso Node entero — o sea, un 404 mal
+// tipeado tira el servidor de todos los negocios. Se corta acá, en el borde.
+function requireIntParam(name) {
+  return (req, res, next) => {
+    const value = Number(req.params[name]);
+    if (!Number.isInteger(value) || value <= 0) {
+      return res.status(400).json({ ok: false, error: 'Parámetro ' + name + ' inválido' });
+    }
+    req.params[name] = value;
+    next();
+  };
+}
+
+// El scoping por business_id en el WHERE protege las filas que ya existen,
+// pero no sirve para un category_id que viene del cliente y se va a ESCRIBIR:
+// ahí hay que confirmar la pertenencia antes. Devuelve el id ya normalizado a
+// entero, o null si no es válido o no es de este negocio.
+async function resolveOwnCategoryId(db, rawCategoryId, businessId) {
+  const categoryId = Number(rawCategoryId);
+  if (!Number.isInteger(categoryId) || categoryId <= 0) return null;
+
+  const [rows] = await db.query(
+    'SELECT id FROM categories WHERE id = ? AND business_id = ?',
+    [categoryId, businessId]
+  );
+  return rows.length > 0 ? categoryId : null;
+}
+
 // === BUSINESS SETTINGS ===
 router.post('/settings', authRequired, upload.fields([
   { name: 'banner', maxCount: 1 },
@@ -69,25 +99,32 @@ router.post('/categories', authRequired, async (req, res) => {
   res.json({ ok: true, id: result.insertId });
 });
 
-router.put('/categories/:id', authRequired, async (req, res) => {
+// OJO: /categories/reorder va ANTES de /categories/:id. Express matchea en
+// orden de registro, así que con el orden invertido (como estaba hasta el
+// 2026-08-06) toda petición a /reorder caía en el handler de /:id con
+// id='reorder' y tumbaba el proceso. Mismo criterio en /products.
+router.put('/categories/reorder', authRequired, async (req, res) => {
+  const db = getPool();
+  const { order } = req.body;
+  if (!Array.isArray(order)) {
+    return res.status(400).json({ ok: false, error: 'Se esperaba un array "order"' });
+  }
+  for (let i = 0; i < order.length; i++) {
+    await db.query('UPDATE categories SET sort_order = ? WHERE id = ? AND business_id = ?', [i, Number(order[i]) || 0, req.session.businessId]);
+  }
+  res.json({ ok: true });
+});
+
+router.put('/categories/:id', authRequired, requireIntParam('id'), async (req, res) => {
   const db = getPool();
   const { name } = req.body;
   await db.query('UPDATE categories SET name = ? WHERE id = ? AND business_id = ?', [name, req.params.id, req.session.businessId]);
   res.json({ ok: true });
 });
 
-router.delete('/categories/:id', authRequired, async (req, res) => {
+router.delete('/categories/:id', authRequired, requireIntParam('id'), async (req, res) => {
   const db = getPool();
   await db.query('DELETE FROM categories WHERE id = ? AND business_id = ?', [req.params.id, req.session.businessId]);
-  res.json({ ok: true });
-});
-
-router.put('/categories/reorder', authRequired, async (req, res) => {
-  const db = getPool();
-  const { order } = req.body;
-  for (let i = 0; i < order.length; i++) {
-    await db.query('UPDATE categories SET sort_order = ? WHERE id = ? AND business_id = ?', [i, order[i], req.session.businessId]);
-  }
   res.json({ ok: true });
 });
 
@@ -95,12 +132,18 @@ router.put('/categories/reorder', authRequired, async (req, res) => {
 router.post('/products', authRequired, upload.single('image'), async (req, res) => {
   const db = getPool();
   const { name, description, price, category_id } = req.body;
+
+  const categoryId = await resolveOwnCategoryId(db, category_id, req.session.businessId);
+  if (categoryId === null) {
+    return res.status(403).json({ ok: false, error: 'La categoría no pertenece a este negocio' });
+  }
+
   const image = req.file ? '/uploads/' + req.session.businessId + '/' + req.file.filename : '';
-  const [maxRows] = await db.query('SELECT COALESCE(MAX(sort_order), 0) + 1 as next FROM products WHERE category_id = ?', [category_id]);
+  const [maxRows] = await db.query('SELECT COALESCE(MAX(sort_order), 0) + 1 as next FROM products WHERE category_id = ? AND business_id = ?', [categoryId, req.session.businessId]);
 
   const [result] = await db.query(
     'INSERT INTO products (business_id, category_id, name, description, price, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [req.session.businessId, category_id, name, description || '', parseFloat(price), image, maxRows[0].next]
+    [req.session.businessId, categoryId, name, description || '', parseFloat(price), image, maxRows[0].next]
   );
 
   res.json({ ok: true, id: result.insertId });
@@ -109,17 +152,27 @@ router.post('/products', authRequired, upload.single('image'), async (req, res) 
 router.put('/products/reorder', authRequired, async (req, res) => {
   const db = getPool();
   const { order } = req.body;
+  if (!Array.isArray(order)) {
+    return res.status(400).json({ ok: false, error: 'Se esperaba un array "order"' });
+  }
   for (let i = 0; i < order.length; i++) {
-    await db.query('UPDATE products SET sort_order = ? WHERE id = ? AND business_id = ?', [i, order[i], req.session.businessId]);
+    await db.query('UPDATE products SET sort_order = ? WHERE id = ? AND business_id = ?', [i, Number(order[i]) || 0, req.session.businessId]);
   }
   res.json({ ok: true });
 });
 
-router.put('/products/:id', authRequired, upload.single('image'), async (req, res) => {
+router.put('/products/:id', authRequired, requireIntParam('id'), upload.single('image'), async (req, res) => {
   const db = getPool();
   const { name, description, price, category_id, is_active } = req.body;
 
-  const fields = { name, description: description || '', price: parseFloat(price), category_id: parseInt(category_id), is_active: is_active !== '0' ? 1 : 0 };
+  // El WHERE de abajo garantiza que el producto sea de este negocio, pero sin
+  // esto se podría mover un producto propio a una categoría ajena.
+  const categoryId = await resolveOwnCategoryId(db, category_id, req.session.businessId);
+  if (categoryId === null) {
+    return res.status(403).json({ ok: false, error: 'La categoría no pertenece a este negocio' });
+  }
+
+  const fields = { name, description: description || '', price: parseFloat(price), category_id: categoryId, is_active: is_active !== '0' ? 1 : 0 };
   if (req.file) fields.image = '/uploads/' + req.session.businessId + '/' + req.file.filename;
 
   const keys = Object.keys(fields);
@@ -131,7 +184,7 @@ router.put('/products/:id', authRequired, upload.single('image'), async (req, re
   res.json({ ok: true });
 });
 
-router.delete('/products/:id', authRequired, async (req, res) => {
+router.delete('/products/:id', authRequired, requireIntParam('id'), async (req, res) => {
   const db = getPool();
   await db.query('DELETE FROM products WHERE id = ? AND business_id = ?', [req.params.id, req.session.businessId]);
   res.json({ ok: true });

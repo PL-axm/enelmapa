@@ -13,16 +13,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'enelmapa-dev-secret-change-in-prod',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    maxAge: 24 * 60 * 60 * 1000,
-    secure: false,
-    sameSite: 'lax'
-  }
-}));
+const { buildSessionOptions } = require('./config/session');
+
+app.use(session(buildSessionOptions()));
 
 const tenantMiddleware = require('./middleware/tenant');
 const publicRoutes = require('./routes/public');

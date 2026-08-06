@@ -92,12 +92,14 @@ describe('tenant scoping (business_id)', () => {
   });
 
   test('PUT /api/products/:id de A sobre un producto de B no lo modifica', async () => {
+    // Con una categoría propia de A: pasa la validación de pertenencia y lo
+    // único que protege es el `AND business_id = ?` del WHERE.
     const res = await agentA
       .put('/api/products/' + businessB.productId)
       .field('name', 'Hackeado por A')
       .field('description', '')
       .field('price', '1')
-      .field('category_id', String(businessB.categoryId));
+      .field('category_id', String(businessA.categoryId));
 
     expect(res.status).toBe(200);
 
@@ -121,27 +123,50 @@ describe('tenant scoping (business_id)', () => {
     expect(res.headers.location).toBe('/admin/login');
   });
 
-  // [BUG CONOCIDO — no se arregla en este cambio, ver plans/testing-qa-integration-setup.md]
-  // routes/api/index.js POST /api/products usa req.session.businessId para
-  // la columna business_id, pero NUNCA valida que category_id pertenezca a
-  // ese mismo negocio (a diferencia de PUT/DELETE, que sí filtran por
-  // business_id en el WHERE). Este test documenta el comportamiento ACTUAL
-  // (inseguro) a propósito: si algún día se agrega la validación, este test
-  // va a fallar y va a obligar a actualizarlo conscientemente, no a
-  // desaparecer en silencio.
-  test('[BUG CONOCIDO] POST /api/products de A acepta un category_id de B sin validar', async () => {
+  // El `AND business_id = ?` del WHERE protege las filas que ya existen, pero
+  // no sirve para un category_id que viene del cliente y se va a ESCRIBIR.
+  // Estos dos casos eran posibles hasta el fix de la Fase 1: el primero
+  // estaba documentado como [BUG CONOCIDO] y el segundo ni siquiera se había
+  // detectado.
+  test('POST /api/products de A rechaza un category_id de B', async () => {
     const res = await agentA.post('/api/products')
       .field('name', 'Producto cruzado')
       .field('description', '')
       .field('price', '1000')
       .field('category_id', String(businessB.categoryId));
 
-    expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
+    expect(res.status).toBe(403);
+    expect(res.body.ok).toBe(false);
 
     const db = getPool();
-    const [rows] = await db.query('SELECT business_id, category_id FROM products WHERE id = ?', [res.body.id]);
-    expect(rows[0].business_id).toBe(businessA.businessId);
-    expect(rows[0].category_id).toBe(businessB.categoryId); // ← esto NO debería ser posible
+    const [rows] = await db.query('SELECT id FROM products WHERE category_id = ? AND business_id = ?',
+      [businessB.categoryId, businessA.businessId]);
+    expect(rows).toHaveLength(0);
+  });
+
+  test('PUT /api/products/:id de A no puede mover un producto propio a una categoría de B', async () => {
+    const res = await agentA
+      .put('/api/products/' + businessA.productId)
+      .field('name', businessA.name + ' producto')
+      .field('description', '')
+      .field('price', '10000')
+      .field('category_id', String(businessB.categoryId));
+
+    expect(res.status).toBe(403);
+    expect(res.body.ok).toBe(false);
+
+    const db = getPool();
+    const [rows] = await db.query('SELECT category_id FROM products WHERE id = ?', [businessA.productId]);
+    expect(rows[0].category_id).toBe(businessA.categoryId);
+  });
+
+  test('POST /api/products con un category_id inexistente se rechaza', async () => {
+    const res = await agentA.post('/api/products')
+      .field('name', 'Producto huérfano')
+      .field('description', '')
+      .field('price', '1000')
+      .field('category_id', '999999');
+
+    expect(res.status).toBe(403);
   });
 });
