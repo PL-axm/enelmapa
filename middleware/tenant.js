@@ -1,4 +1,5 @@
 const { getPool } = require('../db/schema');
+const { getSubdomain } = require('../services/subdomain');
 
 async function tenantMiddleware(req, res, next) {
   let slug = null;
@@ -6,11 +7,7 @@ async function tenantMiddleware(req, res, next) {
   if (req.params.slug) {
     slug = req.params.slug;
   } else {
-    const host = req.hostname;
-    const parts = host.split('.');
-    if (parts.length >= 3 && parts[0] !== 'www' && parts[0] !== 'admin') {
-      slug = parts[0];
-    }
+    slug = getSubdomain(req.hostname);
   }
 
   if (!slug) {

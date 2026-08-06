@@ -36,6 +36,11 @@ subida de contenido (menú de un negocio)?**
    si no existe). No ejecutar cambios de código antes de la aprobación
    explícita.
 3. Ejecutar **solo** en el modo elegido en el paso 1.
+4. **Si el cambio toca backend** (`routes/`, `middleware/`, `db/`,
+   `services/`, `app.js` o `server.js`): correr `npm test` (en verde) y
+   completar `QA_CHECKLIST.md` antes de dar la tarea por terminada. Ver
+   `TESTING.md` para cómo escribir un test nuevo. Cambios solo de vistas
+   EJS/CSS quedan exceptuados de este paso.
 
 La arquitectura completa está documentada en **`CLAUDE.md`** (léelo primero,
 es la fuente autoritativa) — este skill no la repite, agrega lo que ese
@@ -45,8 +50,9 @@ ya diagnosticadas, y el flujo de trabajo acordado con el equipo.
 ## Resumen de una línea
 
 Node.js + Express + EJS (sin bundler) + MySQL (`mysql2/promise`), sin capa de
-servicio (routes → DB directo), sin tests, desplegado en cPanel/Passenger
-(`.htaccess` proxea a un proceso Node local). Tres realms de auth
+servicio (routes → DB directo), desplegado en cPanel/Passenger (`.htaccess`
+proxea a un proceso Node local). Suite de tests Jest+Supertest en `tests/`
+(ver `TESTING.md`). Tres realms de auth
 independientes: público (sin auth), `/admin` (dueño de un negocio, scope por
 `session.businessId`), `/superadmin` (operador de la plataforma, puede tocar
 cualquier negocio).
@@ -88,11 +94,19 @@ cualquier negocio).
   uploads de imagen, sin validación de `slug`/`price` con librería: todos
   hallazgos ya diagnosticados en `BEST_PRACTICES.md` con prioridad — revisar
   esa lista antes de "descubrir" el mismo hallazgo de nuevo.
-- Lógica duplicada conocida (generación de QR, extracción de subdominio,
-  array de días de la semana, alta de negocio+horarios) entre
-  `routes/admin.js` / `routes/api/index.js` / `db/seed.js` /
-  `routes/superadmin.js` — normal por ahora, ver sección 1 de
-  `BEST_PRACTICES.md` para el plan de extracción a `services/`.
+- Lógica duplicada conocida (generación de QR, array de días de la semana,
+  alta de negocio+horarios) entre `routes/admin.js` / `routes/api/index.js`
+  / `db/seed.js` / `routes/superadmin.js` — normal por ahora, ver sección 1
+  de `BEST_PRACTICES.md` para el plan de extracción a `services/`. (La
+  extracción de subdominio ya se hizo — `services/subdomain.js` — como
+  parte del setup de testing, ver `TESTING.md`.)
+- **Hallazgo de seguridad conocido, documentado a propósito y no arreglado
+  todavía**: `POST /api/products` no valida que el `category_id` recibido
+  pertenezca al `business_id` de la sesión (a diferencia de `PUT`/`DELETE`,
+  que sí filtran por `business_id`). Ver el test
+  `[BUG CONOCIDO]` en `tests/integration/tenant-scoping.test.js` — decisión
+  explícita del usuario de documentarlo con un test en vez de arreglarlo de
+  una, el arreglo queda como cambio aparte a evaluar.
 
 ## Setup local
 
@@ -120,8 +134,23 @@ prueba en `enelmapa_dev` sí es seguro correr `npm run seed` ahí, porque es
 una base local vacía dedicada — el riesgo es solo si esas env vars
 apuntaran por error a la base real.
 
-No hay lint/build/test configurado. Para verificar un cambio, probar a mano
-contra las rutas (`curl` o navegador) — no hay suite automática que corra.
+No hay lint/build configurado. Sí hay tests (ver siguiente sección) — para
+cambios de UI/EJS que no tienen cobertura, probar a mano contra las rutas
+(`curl` o navegador).
+
+### Setup de tests
+
+```bash
+sudo mysql -e "
+CREATE DATABASE IF NOT EXISTS enelmapa_test CHARACTER SET utf8mb4;
+GRANT ALL PRIVILEGES ON enelmapa_test.* TO 'enelmapa_dev'@'localhost';
+FLUSH PRIVILEGES;
+"
+npm test
+```
+
+Detalle completo (estructura de `tests/`, cómo agregar un test, gotchas) en
+`TESTING.md`.
 
 ## Flujo de trabajo (git + deploy)
 
@@ -172,5 +201,9 @@ la plataforma en sí).
   onboarding, qué no resuelve todavía la plataforma).
 - `WORKFLOW.md` — diagrama y reglas del flujo de trabajo completo (dev +
   subida de contenido).
+- `TESTING.md` — cómo escribir/correr tests, estructura de `tests/`,
+  gotchas (ej. `--runInBand`, el falso-positivo de subdominio con Hosts
+  tipo IP).
+- `QA_CHECKLIST.md` — checklist manual pre-merge para cambios de backend.
 - `.claude/memory-snapshot/` — contexto/decisiones acumuladas en la máquina
   original (ver el README ahí para cómo usarlo en una máquina nueva).

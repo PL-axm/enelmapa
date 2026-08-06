@@ -24,7 +24,11 @@ flowchart TD
     H -->|Sí| I[Ejecutar SOLO en<br/>el modo elegido]
     I --> J[Rama nueva por cambio<br/>main protegida]
     J --> K[Probar contra<br/>enelmapa_dev local]
-    K --> L[Merge a main]
+    K --> K1{¿Toca backend?<br/>routes/middleware/db/<br/>services/app.js/server.js}
+    K1 -->|Sí| K2[npm test: unit + integración]
+    K2 --> K3[QA_CHECKLIST.md]
+    K3 --> L
+    K1 -->|No, solo vistas/CSS| L[Merge a main]
     L --> M["⚠ Deploy = git pull manual<br/>en el servidor (no automático)"]
 ```
 
@@ -34,6 +38,9 @@ flowchart TD
 - Nunca correr `npm run seed` contra producción — borra **todos** los
   tenants (ver `.claude/skills/enelmapa-dev/SKILL.md`).
 - Nunca tocar `products`/`categories`/etc. sin filtrar por `business_id`.
+- Todo cambio que toque `routes/`, `middleware/`, `db/`, `services/`,
+  `app.js` o `server.js` requiere `npm test` en verde y `QA_CHECKLIST.md`
+  completo antes de mergear. Cambios solo de vistas/CSS quedan exceptuados.
 - Un merge a `main` **no** implica que ya esté desplegado — el deploy es un
   `git pull` manual en el servidor, avisar explícitamente cuando algo está
   listo para eso.
@@ -44,6 +51,8 @@ flowchart TD
   al admin ya desplegado, por HTTP, sin tocar código.
 - `.claude/skills/enelmapa-dev/` — cómo desarrollar sobre este repo (setup
   local, reglas no-negociables, convenciones de código).
+- `tests/` — suite Jest + Supertest (unit + integración). Ver `TESTING.md`.
+- `QA_CHECKLIST.md` — checklist manual pre-merge para cambios de backend.
 - `.claude/memory-snapshot/` — contexto acumulado en la máquina donde se
   armó este flujo por primera vez (ver el README ahí).
 - `PROCEDIMIENTO_CARGA_MENU.md` — versión larga/narrativa del procedimiento

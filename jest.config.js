@@ -1,0 +1,5 @@
+module.exports = {
+  testEnvironment: 'node',
+  setupFiles: ['<rootDir>/tests/env.setup.js'],
+  testTimeout: 10000
+};
