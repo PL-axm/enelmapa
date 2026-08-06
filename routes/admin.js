@@ -1,14 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const QRCode = require('qrcode');
 const { getPool } = require('../db/schema');
 const authRequired = require('../middleware/auth');
+const asyncHandler = require('../middleware/asyncHandler');
+const { config } = require('../config');
 
 router.get('/login', (req, res) => {
   res.render('admin/login', { error: null });
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const db = getPool();
   const [users] = await db.query('SELECT u.*, b.name as business_name, b.slug FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.email = ?', [email]);
@@ -25,14 +28,14 @@ router.post('/login', async (req, res) => {
   req.session.businessSlug = user.slug;
 
   res.redirect('/admin/dashboard');
-});
+}));
 
 router.get('/logout', (req, res) => {
   req.session.destroy();
   res.redirect('/admin/login');
 });
 
-router.get('/dashboard', authRequired, async (req, res) => {
+router.get('/dashboard', authRequired, asyncHandler(async (req, res) => {
   const db = getPool();
   const [businesses] = await db.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
   const [catRows] = await db.query('SELECT COUNT(*) as count FROM categories WHERE business_id = ?', [req.session.businessId]);
@@ -43,17 +46,17 @@ router.get('/dashboard', authRequired, async (req, res) => {
     business: businesses[0],
     stats: { categories: catRows[0].count, products: prodRows[0].count }
   });
-});
+}));
 
-router.get('/settings', authRequired, async (req, res) => {
+router.get('/settings', authRequired, asyncHandler(async (req, res) => {
   const db = getPool();
   const [businesses] = await db.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
   const [hours] = await db.query('SELECT * FROM business_hours WHERE business_id = ? ORDER BY day_index', [req.session.businessId]);
 
   res.render('admin/settings', { session: req.session, business: businesses[0], hours });
-});
+}));
 
-router.get('/categories', authRequired, async (req, res) => {
+router.get('/categories', authRequired, asyncHandler(async (req, res) => {
   const db = getPool();
   const [categories] = await db.query(`
     SELECT c.*, COUNT(p.id) as product_count
@@ -65,9 +68,9 @@ router.get('/categories', authRequired, async (req, res) => {
   `, [req.session.businessId]);
 
   res.render('admin/categories', { session: req.session, categories });
-});
+}));
 
-router.get('/products', authRequired, async (req, res) => {
+router.get('/products', authRequired, asyncHandler(async (req, res) => {
   const db = getPool();
   const [categories] = await db.query('SELECT * FROM categories WHERE business_id = ? ORDER BY sort_order', [req.session.businessId]);
   const [products] = await db.query(`
@@ -79,17 +82,15 @@ router.get('/products', authRequired, async (req, res) => {
   `, [req.session.businessId]);
 
   res.render('admin/products', { session: req.session, categories, products });
-});
+}));
 
-router.get('/qr', authRequired, async (req, res) => {
-  const QRCode = require('qrcode');
+router.get('/qr', authRequired, asyncHandler(async (req, res) => {
   const db = getPool();
   const [businesses] = await db.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
   const business = businesses[0];
-  const domain = process.env.DOMAIN || 'enelmapa.co';
-  const menuUrl = 'https://' + domain + '/s/' + business.slug;
+  const menuUrl = 'https://' + config.domain + '/s/' + business.slug;
   const qrDataUrl = await QRCode.toDataURL(menuUrl, { width: 300, margin: 2, color: { dark: '#1A1A18', light: '#FFFFFF' } });
   res.render('admin/qr', { session: req.session, business, menuUrl, qrDataUrl });
-});
+}));
 
 module.exports = router;

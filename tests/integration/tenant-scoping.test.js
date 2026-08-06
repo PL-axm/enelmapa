@@ -117,10 +117,12 @@ describe('tenant scoping (business_id)', () => {
     expect(rows.length).toBe(1);
   });
 
-  test('request sin sesión a /api/categories redirige a /admin/login (no 401 JSON)', async () => {
+  test('request sin sesión a /api responde 401 JSON', async () => {
+    // Cambió en la Fase 2: antes devolvía un 302 al HTML del login, que para
+    // un `fetch()` es indistinguible de una respuesta válida.
     const res = await request(app).get('/api/qr');
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe('/admin/login');
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ ok: false, error: 'No autenticado' });
   });
 
   // El `AND business_id = ?` del WHERE protege las filas que ya existen, pero

@@ -1,9 +1,18 @@
 const { initDb } = require('./db/schema');
 const { resolveSecureCookie } = require('./config/session');
-const app = require('./app');
 
-const PORT = process.env.PORT || 3000;
-const DOMAIN = process.env.DOMAIN || 'enelmapa.co';
+// config se carga ANTES que app: si falta SESSION_SECRET en producción, esto
+// lanza acá y el proceso no llega a escuchar. Es a propósito — ver el
+// fail-fast en config/index.js.
+let config;
+try {
+  ({ config } = require('./config'));
+} catch (err) {
+  console.error('Configuración inválida: ' + err.message);
+  process.exit(1);
+}
+
+const app = require('./app');
 
 // Con `secure: true`, express-session NO manda la cookie si no ve la request
 // como HTTPS — y detrás de Apache/Passenger eso depende de que el proxy
@@ -18,9 +27,9 @@ function warnAboutSecureCookie() {
 }
 
 initDb().then(() => {
-  app.listen(PORT, () => {
-    console.log('EnElMapa corriendo en puerto ' + PORT);
-    console.log('Dominio: ' + DOMAIN);
+  app.listen(config.port, () => {
+    console.log('EnElMapa corriendo en puerto ' + config.port);
+    console.log('Dominio: ' + config.domain);
     warnAboutSecureCookie();
   });
 }).catch(err => {

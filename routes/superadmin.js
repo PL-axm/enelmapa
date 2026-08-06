@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { getPool } = require('../db/schema');
 const superRequired = require('../middleware/superauth');
+const asyncHandler = require('../middleware/asyncHandler');
 const { verifySuperadmin } = require('../services/superadminAuth');
 
 router.get('/login', (req, res) => {
@@ -23,7 +24,7 @@ router.get('/logout', (req, res) => {
   res.redirect('/superadmin/login');
 });
 
-router.get('/', superRequired, async (req, res) => {
+router.get('/', superRequired, asyncHandler(async (req, res) => {
   const db = getPool();
   const [businesses] = await db.query(`
     SELECT b.*,
@@ -33,13 +34,13 @@ router.get('/', superRequired, async (req, res) => {
     FROM businesses b ORDER BY b.created_at DESC
   `);
   res.render('superadmin/dashboard', { businesses });
-});
+}));
 
 router.get('/create', superRequired, (req, res) => {
   res.render('superadmin/create', { error: null });
 });
 
-router.post('/create', superRequired, async (req, res) => {
+router.post('/create', superRequired, asyncHandler(async (req, res) => {
   const { slug, name, address, phone, whatsapp, instagram, facebook, tiktok, admin_email, admin_password, admin_name } = req.body;
   const db = getPool();
 
@@ -65,17 +66,17 @@ router.post('/create', superRequired, async (req, res) => {
   }
 
   res.redirect('/superadmin');
-});
+}));
 
-router.get('/edit/:id', superRequired, async (req, res) => {
+router.get('/edit/:id', superRequired, asyncHandler(async (req, res) => {
   const db = getPool();
   const [businesses] = await db.query('SELECT * FROM businesses WHERE id = ?', [req.params.id]);
   if (businesses.length === 0) return res.redirect('/superadmin');
   const [users] = await db.query('SELECT id, email, name FROM users WHERE business_id = ?', [req.params.id]);
   res.render('superadmin/edit', { business: businesses[0], users });
-});
+}));
 
-router.post('/edit/:id', superRequired, async (req, res) => {
+router.post('/edit/:id', superRequired, asyncHandler(async (req, res) => {
   const { slug, name, address, phone, whatsapp, instagram, facebook, tiktok, is_open } = req.body;
   const db = getPool();
   await db.query(
@@ -83,21 +84,21 @@ router.post('/edit/:id', superRequired, async (req, res) => {
     [slug, name, address || '', phone || '', whatsapp || '', instagram || '', facebook || '', tiktok || '', is_open ? 1 : 0, req.params.id]
   );
   res.redirect('/superadmin');
-});
+}));
 
-router.post('/reset-password/:userId', superRequired, async (req, res) => {
+router.post('/reset-password/:userId', superRequired, asyncHandler(async (req, res) => {
   const { new_password } = req.body;
   const db = getPool();
   const hash = bcrypt.hashSync(new_password, 10);
   await db.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, req.params.userId]);
   const [users] = await db.query('SELECT business_id FROM users WHERE id = ?', [req.params.userId]);
   res.redirect('/superadmin/edit/' + users[0].business_id);
-});
+}));
 
-router.post('/delete/:id', superRequired, async (req, res) => {
+router.post('/delete/:id', superRequired, asyncHandler(async (req, res) => {
   const db = getPool();
   await db.query('DELETE FROM businesses WHERE id = ?', [req.params.id]);
   res.redirect('/superadmin');
-});
+}));
 
 module.exports = router;
