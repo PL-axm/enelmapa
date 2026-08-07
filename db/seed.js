@@ -1,7 +1,9 @@
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
-const { getPool, initDb } = require('./schema');
+const { initDb } = require('./schema');
+const { createPool } = require('./pool');
+const { loadConfig } = require('../config');
 
 const menuData = [
   {
@@ -176,8 +178,15 @@ const menuData = [
 ];
 
 async function seed() {
-  await initDb();
-  const db = getPool();
+  // Este script borra TODOS los negocios, no sólo el demo (regla
+  // no-negociable #1 del skill). Se avisa a qué base apunta antes de tocarla:
+  // con la config centralizada, esa base ya no está escondida en un
+  // `process.env.DB_NAME || 'enelmapa'` adentro del pool.
+  const config = loadConfig();
+  console.log('Seed sobre la base "' + config.db.database + '" en ' + config.db.host);
+
+  const db = createPool(config.db);
+  await initDb(db);
 
   await db.query('DELETE FROM products');
   await db.query('DELETE FROM categories');

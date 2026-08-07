@@ -36,4 +36,39 @@ describe('loadConfig', () => {
   test('fuera de producción no exige SESSION_SECRET', () => {
     expect(() => loadConfig({ NODE_ENV: 'development' })).not.toThrow();
   });
+
+  // Fase 3: la config de DB y las credenciales del superadmin salieron de
+  // db/schema.js y services/superadminAuth.js, que leían process.env por su
+  // cuenta. Acá se verifica que el traslado no perdió ningún default.
+  describe('db', () => {
+    test('toma las env vars de conexión', () => {
+      const { db } = loadConfig({ DB_HOST: 'h', DB_USER: 'u', DB_PASS: 'p', DB_NAME: 'n' });
+      expect(db).toEqual({ host: 'h', user: 'u', password: 'p', database: 'n' });
+    });
+
+    test('mantiene los defaults de desarrollo local', () => {
+      const { db } = loadConfig({});
+      expect(db).toEqual({ host: 'localhost', user: 'root', password: '', database: 'enelmapa' });
+    });
+  });
+
+  describe('superadmin', () => {
+    test('prefiere el hash cuando está definido', () => {
+      const { superadmin } = loadConfig({ SUPER_EMAIL: 'jefe@x.co', SUPER_PASS_HASH: '$2a$hash' });
+      expect(superadmin.email).toBe('jefe@x.co');
+      expect(superadmin.passwordHash).toBe('$2a$hash');
+    });
+
+    test('sin SUPER_PASS_HASH el hash queda en null (no undefined) y cae al texto plano', () => {
+      const { superadmin } = loadConfig({ SUPER_PASS: 'clave' });
+      expect(superadmin.passwordHash).toBeNull();
+      expect(superadmin.password).toBe('clave');
+    });
+
+    test('conserva los defaults inseguros de local documentados en el skill', () => {
+      const { superadmin } = loadConfig({});
+      expect(superadmin.email).toBe('admin@enelmapa.co');
+      expect(superadmin.password).toBe('super2026');
+    });
+  });
 });

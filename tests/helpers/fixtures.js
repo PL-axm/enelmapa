@@ -1,11 +1,11 @@
 const bcrypt = require('bcryptjs');
-const { getPool } = require('../../db/schema');
+const { getTestPool } = require('./container');
 
 // Crea un negocio completo (con admin, categoría y producto) para usar en
 // tests de tenant-scoping. Password en texto plano se devuelve para poder
 // loguearse en el test; en DB queda hasheado igual que en producción.
 async function createBusiness({ slug, name, adminEmail, adminPassword }) {
-  const db = getPool();
+  const db = getTestPool();
 
   const [bizResult] = await db.query(
     'INSERT INTO businesses (slug, name, is_open) VALUES (?, ?, 1)',

@@ -22,6 +22,16 @@ There is no lint, build, or test command configured. There are no automated test
 
 ## Architecture
 
+### Dependency injection — no module-level singletons
+
+Nothing imports a shared pool or a shared config object. `server.js` calls `loadConfig()`, hands it to `createContainer(config)` (the composition root, `container.js`), and passes what comes out to `createApp({ pool, config })`.
+
+The rule that keeps this honest: **the container is never passed down.** Each router and middleware is a factory that receives only what it uses — `createAdminRouter({ pool, config })`, `createTenantMiddleware({ pool })`, `createPublicRouter()`. Handing the whole container around would make dependencies invisible again and force every test to build the world; that's a service locator, not DI. When you add a route file, follow the same shape: export a `createXRouter({ ... })` factory, destructure only your dependencies, and wire it in `app.js`.
+
+`config/index.js` exports only `loadConfig(env)` — importing it has no side effects and cannot throw. It is the single source for `process.env`: `config.db`, `config.superadmin`, `config.session`, `config.domain`, `config.port`. Do not read `process.env` anywhere else.
+
+Tests build their own app with `tests/helpers/container.js` (`createTestApp()`, `getTestPool()`).
+
 ### Three separate auth realms, one Express app
 
 - **Public menu** — no auth. Resolves a tenant and renders its menu.
@@ -44,7 +54,7 @@ A business is addressed two ways, both handled by `middleware/tenant.js`:
 
 ### Database (MySQL via `mysql2/promise`)
 
-`db/schema.js` exports a singleton pool (`getPool`) and `initDb()`, which is run once at server startup (`server.js`) before `app.listen`. There is no migration framework: schema evolution is done by adding new `CREATE TABLE IF NOT EXISTS` blocks and/or best-effort `ALTER TABLE` statements wrapped in `try/catch` (see the `menu_theme` column add in `initDb`) so re-running is always safe. Follow this pattern for new columns/tables rather than introducing a migration tool.
+`db/pool.js` exports `createPool(config.db)` — a factory, not a singleton. `db/schema.js` is now only `initDb(pool)`, run once at server startup (`server.js`) before `app.listen`. There is no migration framework: schema evolution is done by adding new `CREATE TABLE IF NOT EXISTS` blocks and/or best-effort `ALTER TABLE` statements wrapped in `try/catch` (see the `menu_theme` column add in `initDb`) so re-running is always safe. Follow this pattern for new columns/tables rather than introducing a migration tool.
 
 Core tables: `businesses` (1 per tenant, has `slug`, contact/social fields, `is_open`, `menu_theme`) → `business_hours` (7 rows/business), `categories` → `products`, and `users` (admin logins, one business each via `business_id` FK). All tenant-scoped queries filter by `business_id`.
 

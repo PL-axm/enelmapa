@@ -1,5 +1,10 @@
-const { errorHandler, wantsJson } = require('../../middleware/errorHandler');
+const { createErrorHandler, wantsJson } = require('../../middleware/errorHandler');
 const { ForbiddenError, NotFoundError } = require('../../errors');
+
+// La config entra inyectada (Fase 3): antes el handler importaba el singleton,
+// así que la rama de producción no se podía ejercitar desde un unit test.
+const errorHandler = createErrorHandler({ config: { isProduction: false } });
+const errorHandlerEnProduccion = createErrorHandler({ config: { isProduction: true } });
 
 function fakeReq({ url = '/admin/products', accept = 'text/html', xhr = false } = {}) {
   return { method: 'GET', originalUrl: url, xhr, get: () => accept };
@@ -76,6 +81,24 @@ describe('errorHandler', () => {
 
     expect(consoleWarn).toHaveBeenCalled();
     expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  // Un 500 puede traer SQL o rutas del filesystem en el mensaje. Los errores
+  // previstos no: su mensaje está escrito para que lo lea el usuario.
+  test('en producción el mensaje de un 500 se enmascara', () => {
+    const res = fakeRes();
+    errorHandlerEnProduccion(new Error('ER_ACCESS_DENIED para root@localhost'), fakeReq({ url: '/api/categories' }), res, () => {});
+
+    expect(res.statusCode).toBe(500);
+    expect(res.jsonBody).toEqual({ ok: false, error: 'Error interno' });
+  });
+
+  test('en producción un error de dominio conserva su mensaje', () => {
+    const res = fakeRes();
+    errorHandlerEnProduccion(new ForbiddenError('La categoría no es tuya'), fakeReq({ url: '/api/products' }), res, () => {});
+
+    expect(res.statusCode).toBe(403);
+    expect(res.jsonBody).toEqual({ ok: false, error: 'La categoría no es tuya' });
   });
 
   test('si la respuesta ya empezó, delega en Express en vez de romper', () => {

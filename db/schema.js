@@ -1,25 +1,7 @@
-const mysql = require('mysql2/promise');
-
-let pool = null;
-
-function getPool() {
-  if (!pool) {
-    pool = mysql.createPool({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASS || '',
-      database: process.env.DB_NAME || 'enelmapa',
-      waitForConnections: true,
-      connectionLimit: 10,
-      charset: 'utf8mb4'
-    });
-  }
-  return pool;
-}
-
-async function initDb() {
-  const db = getPool();
-
+// Este módulo quedó con una sola responsabilidad: el DDL. La creación del
+// pool se mudó a db/pool.js (Fase 3) y las migraciones versionadas reemplazan
+// al ALTER en try/catch en la Fase 7.
+async function initDb(db) {
   await db.query(`
     CREATE TABLE IF NOT EXISTS businesses (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -92,4 +74,4 @@ async function initDb() {
   `);
 }
 
-module.exports = { getPool, initDb };
+module.exports = { initDb };

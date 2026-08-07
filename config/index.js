@@ -1,12 +1,24 @@
 const { buildSessionOptions } = require('./session');
 
 // Fuente única de configuración. Antes cada archivo hacía su propio
-// `process.env.X || 'default'` — `DOMAIN` estaba escrito en tres lugares
+// `process.env.X || default` — `DOMAIN` estaba escrito en tres lugares
 // distintos, así que cambiar el default en uno y olvidarse de otro era
 // cuestión de tiempo (hallazgo E4 de BEST_PRACTICES.md).
+//
+// Fase 3: este módulo exporta SOLO la función. Antes exportaba también
+// `config: loadConfig()`, o sea que un `require` podía lanzar — por eso
+// server.js necesitaba un try/catch alrededor de un import, que es un lugar
+// raro para manejar un error. Ahora quien arranca el proceso llama
+// `loadConfig()` cuando quiere y se lo pasa al container.
 
 const DEFAULT_DOMAIN = 'enelmapa.co';
 const DEFAULT_PORT = 3000;
+
+// Credenciales del superadmin. Los defaults son inseguros a propósito y solo
+// aceptables en local (regla no-negociable #2 del skill); viven acá y no en
+// services/superadminAuth.js para que ese módulo no lea `process.env`.
+const DEFAULT_SUPER_EMAIL = 'admin@enelmapa.co';
+const DEFAULT_SUPER_PASS = 'super2026';
 
 function loadConfig(env = process.env) {
   const nodeEnv = env.NODE_ENV || 'development';
@@ -29,8 +41,19 @@ function loadConfig(env = process.env) {
     isProduction,
     port: Number(env.PORT) || DEFAULT_PORT,
     domain: env.DOMAIN || DEFAULT_DOMAIN,
+    db: {
+      host: env.DB_HOST || 'localhost',
+      user: env.DB_USER || 'root',
+      password: env.DB_PASS || '',
+      database: env.DB_NAME || 'enelmapa'
+    },
+    superadmin: {
+      email: env.SUPER_EMAIL || DEFAULT_SUPER_EMAIL,
+      passwordHash: env.SUPER_PASS_HASH || null,
+      password: env.SUPER_PASS || DEFAULT_SUPER_PASS
+    },
     session: buildSessionOptions(env)
   };
 }
 
-module.exports = { loadConfig, config: loadConfig() };
+module.exports = { loadConfig };
