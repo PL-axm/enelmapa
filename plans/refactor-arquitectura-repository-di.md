@@ -205,6 +205,30 @@ el pool en vez de depender de `tests/env.setup.js` para forzar la base.
 llamar repos en vez de SQL inline. Es la fase de mayor valor y mayor riesgo: se hace recurso por
 recurso (categorías → productos → negocio → usuarios → horarios), corriendo la suite entre cada uno.
 
+> **Nota de alcance agregada el 2026-08-07 — transacciones.** Los repos se construyen sobre un
+> *ejecutor*, no sobre el pool: `buildRepos(db)` donde `db` puede ser el pool o una
+> `PoolConnection` (en `mysql2` los dos exponen la misma `.query()`, así que el repo no necesita
+> saber cuál le tocó). El container expone `withTransaction(fn)`, que abre una conexión y le pasa
+> a `fn` un juego nuevo de repos atado a ella.
+>
+> Se decide acá y no más tarde porque define la firma de los cinco repos. La alternativa —un
+> parámetro `{ conn }` opcional en cada método— duplica ~25 firmas y basta olvidarlo en una para
+> perder la atomicidad en silencio; adentro de `withTransaction` sólo existe `tx`, así que mezclar
+> una llamada del pool con una de la conexión deja de ser posible.
+>
+> El uso llega en la Fase 5, con los servicios. Los dos únicos call sites que lo necesitan:
+> `POST /superadmin/create` (negocio + usuario + 7 horarios) y `POST /api/settings` (negocio +
+> loop de horarios). El resto son escrituras de una sola sentencia.
+>
+> Motivo concreto, reproducido contra `enelmapa_dev` el 2026-08-07: si el `admin_email` ya existe
+> (`users.email` es UNIQUE y `POST /create` sólo pre-chequea el `slug`), el negocio se inserta, el
+> usuario falla, y queda un negocio con 0 admins y 0 horarios — con el slug ocupado, así que el
+> operador no puede ni reintentar.
+>
+> Guardarraíl: `withTransaction` no es el default. Envolver sólo el tramo de escrituras, nunca
+> subida de imágenes ni generación de QR — una transacción abierta retiene una conexión de un pool
+> de 10.
+
 **Fase 5 — Servicios + controllers.** `routes/` queda como cableado puro. Se eliminan las cuatro
 duplicaciones de E3. `db/seed.js` pasa a usar `businessService`, así deja de ser una tercera copia.
 

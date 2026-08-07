@@ -1,4 +1,5 @@
 const { createPool } = require('./db/pool');
+const categoryRepository = require('./repositories/categoryRepository');
 
 // Composition root: el ÚNICO lugar del código que construye dependencias.
 // Todo lo demás las recibe.
@@ -9,19 +10,54 @@ const { createPool } = require('./db/pool');
 // pasáramos el container entero a cada pieza, tendríamos un service locator
 // disfrazado de DI: las dependencias dejarían de estar declaradas en la firma
 // y cualquier test volvería a necesitar el mundo completo para arrancar.
+
+// `db` es un ejecutor: el pool, o una PoolConnection cuando estamos adentro de
+// una transacción. Los dos tienen la misma `.query()`, así que los repos no
+// necesitan enterarse — por eso `withTransaction` puede rearmar el juego
+// entero atado a la conexión en vez de agregar un `{ conn }` opcional a los
+// ~25 métodos de los cinco repos.
 //
-// En la Fase 4 los repositories se cablean acá (pool → repos → services), y
-// los routers pasan a recibir repos en vez del pool crudo.
+// Los colaboradores se INYECTAN, nunca se construyen adentro de un repo: si
+// productRepository hiciera `categoryRepository(db)` por su cuenta, volveríamos
+// a tener una dependencia oculta que ningún test puede reemplazar.
+function buildRepos(db) {
+  const categories = categoryRepository(db);
+
+  return { categories };
+}
+
 function createContainer(config) {
   const pool = createPool(config.db);
+  const repos = buildRepos(pool);
+
+  // Sólo para invariantes que abarcan más de una escritura. No es el default:
+  // una transacción abierta retiene una conexión de un pool de 10, así que
+  // nunca envolver subida de imágenes ni generación de QR — sólo el tramo de
+  // escrituras.
+  async function withTransaction(fn) {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const result = await fn(buildRepos(conn));
+      await conn.commit();
+      return result;
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
 
   return {
     config,
     pool,
+    repos,
+    withTransaction,
     async close() {
       await pool.end();
     }
   };
 }
 
-module.exports = { createContainer };
+module.exports = { createContainer, buildRepos };

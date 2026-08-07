@@ -13,9 +13,13 @@ const { getSubdomain } = require('./services/subdomain');
 
 // Antes este archivo creaba la app al importarse y cada router se traía el
 // pool y la config por su cuenta con un `require` a nivel de módulo. Ahora
-// recibe las dos dependencias y las reparte: cada pieza declara en su firma lo
+// recibe las dependencias y las reparte: cada pieza declara en su firma lo
 // que necesita, y nadie recibe el container entero (ver container.js).
-function createApp({ pool, config }) {
+//
+// `pool` y `repos` conviven mientras dure la Fase 4: `repos` para los recursos
+// ya migrados, `pool` para el SQL inline que queda. Al cerrar la fase, `pool`
+// tiene que desaparecer de las firmas de los routers.
+function createApp({ pool, repos, config }) {
   const app = express();
 
   app.set('view engine', 'ejs');
@@ -29,7 +33,7 @@ function createApp({ pool, config }) {
 
   app.use(session(config.session));
 
-  const tenantMiddleware = createTenantMiddleware({ pool });
+  const tenantMiddleware = createTenantMiddleware({ pool, repos });
   const publicRoutes = createPublicRouter();
 
   app.use((req, res, next) => {
@@ -46,9 +50,9 @@ function createApp({ pool, config }) {
     next();
   });
 
-  app.use('/admin', createAdminRouter({ pool, config }));
+  app.use('/admin', createAdminRouter({ pool, repos, config }));
   app.use('/superadmin', createSuperadminRouter({ pool, config }));
-  app.use('/api', createApiRouter({ pool, config }));
+  app.use('/api', createApiRouter({ pool, repos, config }));
 
   app.get('/s/:slug', tenantMiddleware, publicRoutes);
 

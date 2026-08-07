@@ -25,9 +25,17 @@ function getTestPool() {
 }
 
 // Cada test de integración arma su propia app sobre el container compartido.
+//
+// Se le pasa el container entero, igual que hace server.js — a propósito. Si
+// acá enumeráramos las dependencias por separado, este cableado y el real
+// podrían divergir, y la suite quedaría verde con la app de producción rota.
+// Ya pasó una vez, al agregar `repos` en la Fase 4.
 function createTestApp() {
-  const { pool, config } = getTestContainer();
-  return createApp({ pool, config });
+  return createApp(getTestContainer());
 }
 
-module.exports = { getTestContainer, getTestPool, createTestApp };
+function getTestRepos() {
+  return getTestContainer().repos;
+}
+
+module.exports = { getTestContainer, getTestPool, getTestRepos, createTestApp };

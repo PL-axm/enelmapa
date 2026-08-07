@@ -4,11 +4,11 @@ const QRCode = require('qrcode');
 const authRequired = require('../middleware/auth');
 const asyncHandler = require('../middleware/asyncHandler');
 
-// Recibe sólo lo que usa: el pool para las lecturas y la config para
-// `domain` (la URL del QR). En la Fase 4 `pool` se reemplaza por los repos y
-// los handlers dejan de tener SQL; en la Fase 5 el QR se va a `qrService`,
-// que hoy está duplicado con routes/api/index.js (hallazgo E3).
-function createAdminRouter({ pool, config }) {
+// Recibe sólo lo que usa. `pool` y `repos` conviven mientras dure la Fase 4:
+// categorías ya sale del repo, el resto todavía es SQL inline. En la Fase 5 el
+// QR se va a `qrService`, que hoy está duplicado con routes/api/index.js
+// (hallazgo E3).
+function createAdminRouter({ pool, repos, config }) {
   const router = express.Router();
 
   router.get('/login', (req, res) => {
@@ -40,13 +40,13 @@ function createAdminRouter({ pool, config }) {
 
   router.get('/dashboard', authRequired, asyncHandler(async (req, res) => {
     const [businesses] = await pool.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
-    const [catRows] = await pool.query('SELECT COUNT(*) as count FROM categories WHERE business_id = ?', [req.session.businessId]);
+    const categories = await repos.categories.forBusiness(req.session.businessId).count();
     const [prodRows] = await pool.query('SELECT COUNT(*) as count FROM products WHERE business_id = ?', [req.session.businessId]);
 
     res.render('admin/dashboard', {
       session: req.session,
       business: businesses[0],
-      stats: { categories: catRows[0].count, products: prodRows[0].count }
+      stats: { categories, products: prodRows[0].count }
     });
   }));
 
@@ -58,20 +58,15 @@ function createAdminRouter({ pool, config }) {
   }));
 
   router.get('/categories', authRequired, asyncHandler(async (req, res) => {
-    const [categories] = await pool.query(`
-      SELECT c.*, COUNT(p.id) as product_count
-      FROM categories c
-      LEFT JOIN products p ON p.category_id = c.id
-      WHERE c.business_id = ?
-      GROUP BY c.id
-      ORDER BY c.sort_order
-    `, [req.session.businessId]);
+    const categories = await repos.categories
+      .forBusiness(req.session.businessId)
+      .listWithProductCount();
 
     res.render('admin/categories', { session: req.session, categories });
   }));
 
   router.get('/products', authRequired, asyncHandler(async (req, res) => {
-    const [categories] = await pool.query('SELECT * FROM categories WHERE business_id = ? ORDER BY sort_order', [req.session.businessId]);
+    const categories = await repos.categories.forBusiness(req.session.businessId).listOrdered();
     const [products] = await pool.query(`
       SELECT p.*, c.name as category_name
       FROM products p

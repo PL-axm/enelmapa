@@ -26,19 +26,16 @@ function requireIntParam(name) {
 // ahí hay que confirmar la pertenencia antes. Devuelve el id ya normalizado a
 // entero, o null si no es válido o no es de este negocio.
 //
-// Esto es una regla de autorización viviendo en un archivo de rutas, o sea que
-// depende de que cada handler se acuerde de llamarla. En la Fase 4 se muda
-// adentro de `productRepository.forBusiness()`, que es donde olvidarla deja de
-// ser posible.
-async function resolveOwnCategoryId(db, rawCategoryId, businessId) {
+// La consulta ya vive en el repo; lo que queda acá es la normalización a
+// entero. Cuando se migre `products` esto desaparece del todo: la validación
+// pasa adentro de `productRepository.forBusiness().create()`, que es donde
+// olvidarla deja de ser posible.
+async function resolveOwnCategoryId(categoryRepo, rawCategoryId, businessId) {
   const categoryId = Number(rawCategoryId);
   if (!Number.isInteger(categoryId) || categoryId <= 0) return null;
 
-  const [rows] = await db.query(
-    'SELECT id FROM categories WHERE id = ? AND business_id = ?',
-    [categoryId, businessId]
-  );
-  return rows.length > 0 ? categoryId : null;
+  const owns = await categoryRepo.forBusiness(businessId).exists(categoryId);
+  return owns ? categoryId : null;
 }
 
 function requireOrderArray(order) {
@@ -48,12 +45,11 @@ function requireOrderArray(order) {
   return order;
 }
 
-// Recibe el pool y la config. En la Fase 4 `pool` se cambia por
-// `{ categoryRepo, productRepo, businessRepo }` y todo el SQL de acá se va con
-// ellos; los handlers quedan como cableado (validar → llamar al repo →
-// responder). Por eso la inyección entra en el factory del router y no en cada
-// handler: esa fase toca esta firma y nada más.
-function createApiRouter({ pool, config }) {
+// `pool` y `repos` conviven mientras dure la Fase 4: categorías ya salió, y
+// productos/negocio/horarios siguen con SQL inline hasta que les toque. Al
+// cerrar la fase `pool` desaparece de esta firma y los handlers quedan como
+// cableado puro: validar → llamar al repo → responder.
+function createApiRouter({ pool, repos, config }) {
   const router = express.Router();
 
   const storage = multer.diskStorage({
@@ -110,11 +106,12 @@ function createApiRouter({ pool, config }) {
   }));
 
   // === CATEGORIES ===
+  // Ya migrado al repo: no queda ni un `business_id` escrito a mano en estos
+  // cuatro handlers. El scope entra una vez, en `forBusiness`.
   router.post('/categories', authRequired, asyncHandler(async (req, res) => {
     const { name } = req.body;
-    const [maxRows] = await pool.query('SELECT COALESCE(MAX(sort_order), 0) + 1 as next FROM categories WHERE business_id = ?', [req.session.businessId]);
-    const [result] = await pool.query('INSERT INTO categories (business_id, name, sort_order) VALUES (?, ?, ?)', [req.session.businessId, name, maxRows[0].next]);
-    res.json({ ok: true, id: result.insertId });
+    const id = await repos.categories.forBusiness(req.session.businessId).create({ name });
+    res.json({ ok: true, id });
   }));
 
   // OJO: /categories/reorder va ANTES de /categories/:id. Express matchea en
@@ -123,20 +120,21 @@ function createApiRouter({ pool, config }) {
   // id='reorder' y tumbaba el proceso. Mismo criterio en /products.
   router.put('/categories/reorder', authRequired, asyncHandler(async (req, res) => {
     const order = requireOrderArray(req.body.order);
-    for (let i = 0; i < order.length; i++) {
-      await pool.query('UPDATE categories SET sort_order = ? WHERE id = ? AND business_id = ?', [i, Number(order[i]) || 0, req.session.businessId]);
-    }
+    await repos.categories.forBusiness(req.session.businessId).reorder(order);
     res.json({ ok: true });
   }));
 
+  // `rename`/`remove` devuelven si afectaron alguna fila, pero acá todavía se
+  // ignora: distinguir "no existe" de "no es tuyo" de "listo" es B4, que
+  // cambia el contrato de /api y va en su propia rama.
   router.put('/categories/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
     const { name } = req.body;
-    await pool.query('UPDATE categories SET name = ? WHERE id = ? AND business_id = ?', [name, req.params.id, req.session.businessId]);
+    await repos.categories.forBusiness(req.session.businessId).rename(req.params.id, name);
     res.json({ ok: true });
   }));
 
   router.delete('/categories/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
-    await pool.query('DELETE FROM categories WHERE id = ? AND business_id = ?', [req.params.id, req.session.businessId]);
+    await repos.categories.forBusiness(req.session.businessId).remove(req.params.id);
     res.json({ ok: true });
   }));
 
@@ -144,7 +142,7 @@ function createApiRouter({ pool, config }) {
   router.post('/products', authRequired, upload.single('image'), asyncHandler(async (req, res) => {
     const { name, description, price, category_id } = req.body;
 
-    const categoryId = await resolveOwnCategoryId(pool, category_id, req.session.businessId);
+    const categoryId = await resolveOwnCategoryId(repos.categories, category_id, req.session.businessId);
     if (categoryId === null) {
       throw new ForbiddenError('La categoría no pertenece a este negocio');
     }
@@ -173,7 +171,7 @@ function createApiRouter({ pool, config }) {
 
     // El WHERE de abajo garantiza que el producto sea de este negocio, pero sin
     // esto se podría mover un producto propio a una categoría ajena.
-    const categoryId = await resolveOwnCategoryId(pool, category_id, req.session.businessId);
+    const categoryId = await resolveOwnCategoryId(repos.categories, category_id, req.session.businessId);
     if (categoryId === null) {
       throw new ForbiddenError('La categoría no pertenece a este negocio');
     }
