@@ -1,7 +1,9 @@
 const request = require('supertest');
-const app = require('../../app');
+const { createTestApp } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createBusiness } = require('../helpers/fixtures');
+
+const app = createTestApp();
 
 describe('auth de /admin', () => {
   let business;

@@ -1,6 +1,8 @@
 const request = require('supertest');
-const app = require('../../app');
+const { createTestApp } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
+
+const app = createTestApp();
 
 describe('smoke test', () => {
   beforeEach(async () => {

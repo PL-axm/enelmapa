@@ -1,7 +1,9 @@
 const request = require('supertest');
-const app = require('../../app');
+const { createTestApp } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createBusiness } = require('../helpers/fixtures');
+
+const app = createTestApp();
 
 // Cubre B6/B7 y S8: hasta la Fase 2 no había error handler central (un throw
 // async colgaba la request o mataba el proceso) y /api respondía con un

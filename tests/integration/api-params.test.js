@@ -1,8 +1,9 @@
 const request = require('supertest');
-const app = require('../../app');
-const { getPool } = require('../../db/schema');
+const { createTestApp, getTestPool } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createBusiness } = require('../helpers/fixtures');
+
+const app = createTestApp();
 
 // Cubre B1: `PUT /api/categories/reorder` caía en el handler de
 // `/categories/:id` (registrado antes) y ejecutaba
@@ -35,7 +36,7 @@ describe('parámetros y orden de rutas en /api', () => {
   });
 
   test('PUT /api/categories/reorder reordena de verdad (no cae en /:id)', async () => {
-    const db = getPool();
+    const db = getTestPool();
     const [segunda] = await db.query(
       'INSERT INTO categories (business_id, name, sort_order) VALUES (?, ?, 1)',
       [business.businessId, 'Segunda categoría']
@@ -56,13 +57,13 @@ describe('parámetros y orden de rutas en /api', () => {
   test('el nombre de la categoría no se pisa al reordenar', async () => {
     await agent.put('/api/categories/reorder').send({ order: [business.categoryId] });
 
-    const db = getPool();
+    const db = getTestPool();
     const [rows] = await db.query('SELECT name FROM categories WHERE id = ?', [business.categoryId]);
     expect(rows[0].name).toBe(business.name + ' categoría');
   });
 
   test('PUT /api/products/reorder reordena de verdad', async () => {
-    const db = getPool();
+    const db = getTestPool();
     const [segundo] = await db.query(
       'INSERT INTO products (business_id, category_id, name, description, price, sort_order) VALUES (?, ?, ?, ?, ?, 1)',
       [business.businessId, business.categoryId, 'Segundo producto', '', 5000]

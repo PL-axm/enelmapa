@@ -15,9 +15,9 @@ const bcrypt = require('bcryptjs');
 //     como fallback para no romper el despliegue actual, pero es el camino a
 //     abandonar — generar el hash con:
 //       node -e "console.log(require('bcryptjs').hashSync('LA_PASS', 10))"
-
-const DEFAULT_EMAIL = 'admin@enelmapa.co';
-const DEFAULT_PASS = 'super2026';
+//
+// Fase 3: recibe `config.superadmin` en vez de leer `process.env`. La lectura
+// del entorno y sus defaults viven en un solo lugar (config/index.js).
 
 function safeEqual(a, b) {
   const bufA = Buffer.from(String(a), 'utf8');
@@ -33,16 +33,15 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-function verifySuperadmin({ email, password }, env = process.env) {
-  const expectedEmail = env.SUPER_EMAIL || DEFAULT_EMAIL;
-  const passwordHash = env.SUPER_PASS_HASH;
+function verifySuperadmin({ email, password }, superadminConfig) {
+  const { email: expectedEmail, passwordHash, password: expectedPassword } = superadminConfig;
 
   // Sin `&&`: los dos chequeos corren siempre, así el tiempo de respuesta no
   // revela si lo que falló fue el email o la contraseña.
   const emailOk = safeEqual(email || '', expectedEmail);
   const passwordOk = passwordHash
     ? bcrypt.compareSync(password || '', passwordHash)
-    : safeEqual(password || '', env.SUPER_PASS || DEFAULT_PASS);
+    : safeEqual(password || '', expectedPassword);
 
   return emailOk && passwordOk;
 }

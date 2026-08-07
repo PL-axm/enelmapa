@@ -1,8 +1,9 @@
 const request = require('supertest');
-const app = require('../../app');
-const { getPool } = require('../../db/schema');
+const { createTestApp, getTestPool } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createTwoBusinesses } = require('../helpers/fixtures');
+
+const app = createTestApp();
 
 // Cubre el riesgo #1 de BEST_PRACTICES.md: el filtro de business_id es
 // manual en cada query (no hay repository/ORM que lo fuerce). Estos tests
@@ -45,7 +46,7 @@ describe('tenant scoping (business_id)', () => {
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
 
-    const db = getPool();
+    const db = getTestPool();
     const [rows] = await db.query('SELECT business_id FROM categories WHERE id = ?', [res.body.id]);
     expect(rows[0].business_id).toBe(businessA.businessId);
   });
@@ -62,7 +63,7 @@ describe('tenant scoping (business_id)', () => {
     // código HTTP.
     expect(res.status).toBe(200);
 
-    const db = getPool();
+    const db = getTestPool();
     const [rows] = await db.query('SELECT name FROM categories WHERE id = ?', [businessB.categoryId]);
     expect(rows[0].name).toBe(businessB.name + ' categoría');
   });
@@ -71,7 +72,7 @@ describe('tenant scoping (business_id)', () => {
     const res = await agentA.delete('/api/categories/' + businessB.categoryId);
     expect(res.status).toBe(200);
 
-    const db = getPool();
+    const db = getTestPool();
     const [rows] = await db.query('SELECT id FROM categories WHERE id = ?', [businessB.categoryId]);
     expect(rows.length).toBe(1);
   });
@@ -86,7 +87,7 @@ describe('tenant scoping (business_id)', () => {
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
 
-    const db = getPool();
+    const db = getTestPool();
     const [rows] = await db.query('SELECT business_id FROM products WHERE id = ?', [res.body.id]);
     expect(rows[0].business_id).toBe(businessA.businessId);
   });
@@ -103,7 +104,7 @@ describe('tenant scoping (business_id)', () => {
 
     expect(res.status).toBe(200);
 
-    const db = getPool();
+    const db = getTestPool();
     const [rows] = await db.query('SELECT name FROM products WHERE id = ?', [businessB.productId]);
     expect(rows[0].name).toBe(businessB.name + ' producto');
   });
@@ -112,7 +113,7 @@ describe('tenant scoping (business_id)', () => {
     const res = await agentA.delete('/api/products/' + businessB.productId);
     expect(res.status).toBe(200);
 
-    const db = getPool();
+    const db = getTestPool();
     const [rows] = await db.query('SELECT id FROM products WHERE id = ?', [businessB.productId]);
     expect(rows.length).toBe(1);
   });
@@ -140,7 +141,7 @@ describe('tenant scoping (business_id)', () => {
     expect(res.status).toBe(403);
     expect(res.body.ok).toBe(false);
 
-    const db = getPool();
+    const db = getTestPool();
     const [rows] = await db.query('SELECT id FROM products WHERE category_id = ? AND business_id = ?',
       [businessB.categoryId, businessA.businessId]);
     expect(rows).toHaveLength(0);
@@ -157,7 +158,7 @@ describe('tenant scoping (business_id)', () => {
     expect(res.status).toBe(403);
     expect(res.body.ok).toBe(false);
 
-    const db = getPool();
+    const db = getTestPool();
     const [rows] = await db.query('SELECT category_id FROM products WHERE id = ?', [businessA.productId]);
     expect(rows[0].category_id).toBe(businessA.categoryId);
   });
