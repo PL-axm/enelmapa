@@ -1,4 +1,5 @@
 const { createPool } = require('./db/pool');
+const { createSessionStore } = require('./db/sessionStore');
 const categoryRepository = require('./repositories/categoryRepository');
 const productRepository = require('./repositories/productRepository');
 const businessRepository = require('./repositories/businessRepository');
@@ -36,6 +37,10 @@ function createContainer(config) {
   const pool = createPool(config.db);
   const repos = buildRepos(pool);
 
+  // El store de sesión se arma acá y no en config/ porque necesita el pool, y
+  // config no sabe nada de conexiones — sólo lee variables de entorno.
+  const sessionStore = createSessionStore(pool);
+
   // Sólo para invariantes que abarcan más de una escritura. No es el default:
   // una transacción abierta retiene una conexión de un pool de 10, así que
   // nunca envolver subida de imágenes ni generación de QR — sólo el tramo de
@@ -59,8 +64,12 @@ function createContainer(config) {
     config,
     pool,
     repos,
+    sessionStore,
     withTransaction,
+    // El store tiene su propio timer de limpieza de sesiones vencidas: si no
+    // se cierra, el proceso (y Jest) quedan colgados esperándolo.
     async close() {
+      await new Promise(resolve => sessionStore.close(resolve));
       await pool.end();
     }
   };

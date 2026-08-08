@@ -1,8 +1,6 @@
 const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const QRCode = require('qrcode');
+const { createUploader, verificarImagenes, traducirErroresDeSubida } = require('../../services/imageUpload');
 const authRequired = require('../../middleware/auth');
 const asyncHandler = require('../../middleware/asyncHandler');
 const { ValidationError, NotFoundError } = require('../../errors');
@@ -47,24 +45,13 @@ function requireOrderArray(order) {
 function createApiRouter({ repos, config }) {
   const router = express.Router();
 
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      const dir = path.join(__dirname, '../../uploads', String(req.session.businessId));
-      fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      cb(null, Date.now() + '-' + Math.random().toString(36).substring(2, 8) + ext);
-    }
-  });
-  const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+  const upload = createUploader();
 
   // === BUSINESS SETTINGS ===
   router.post('/settings', authRequired, upload.fields([
     { name: 'banner', maxCount: 1 },
     { name: 'logo', maxCount: 1 }
-  ]), asyncHandler(async (req, res) => {
+  ]), verificarImagenes, asyncHandler(async (req, res) => {
     const { name, address, phone, whatsapp, instagram, facebook, tiktok, is_open } = req.body;
 
     let banner_img, logo_img;
@@ -136,7 +123,7 @@ function createApiRouter({ repos, config }) {
     ? '/uploads/' + req.session.businessId + '/' + req.file.filename
     : '';
 
-  router.post('/products', authRequired, upload.single('image'), asyncHandler(async (req, res) => {
+  router.post('/products', authRequired, upload.single('image'), verificarImagenes, asyncHandler(async (req, res) => {
     const { name, description, price, category_id } = req.body;
 
     const id = await repos.products.forBusiness(req.session.businessId).create({
@@ -156,7 +143,7 @@ function createApiRouter({ repos, config }) {
     res.json({ ok: true });
   }));
 
-  router.put('/products/:id', authRequired, requireIntParam('id'), upload.single('image'), asyncHandler(async (req, res) => {
+  router.put('/products/:id', authRequired, requireIntParam('id'), upload.single('image'), verificarImagenes, asyncHandler(async (req, res) => {
     const { name, description, price, category_id, is_active } = req.body;
 
     const afectó = await repos.products.forBusiness(req.session.businessId).update(req.params.id, {
@@ -186,6 +173,11 @@ function createApiRouter({ repos, config }) {
     const qr = await QRCode.toDataURL(menuUrl, { width: size, margin: 2, color: { dark: '#1A1A18', light: '#FFFFFF' } });
     res.json({ qr });
   }));
+
+  // Va al final: traduce los errores de multer (que llegan sin statusCode y en
+  // inglés) a errores de dominio, antes de que el handler central los tome por
+  // bugs y responda 500.
+  router.use(traducirErroresDeSubida);
 
   return router;
 }

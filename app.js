@@ -20,7 +20,7 @@ const { getSubdomain } = require('./services/subdomain');
 // repositories/, así que la app se arma sólo con repos y config. Que `pool` no
 // aparezca en ninguna firma de router es la señal de que la migración está
 // completa.
-function createApp({ repos, config }) {
+function createApp({ repos, config, sessionStore }) {
   const app = express();
 
   app.set('view engine', 'ejs');
@@ -30,9 +30,15 @@ function createApp({ repos, config }) {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(express.static(path.join(__dirname, 'public')));
-  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+  // `nosniff` es la tercera capa de S6: aunque algo se colara en uploads/, el
+  // navegador no lo va a interpretar como HTML o JS por adivinar el tipo.
+  // Importa porque uploads/ se sirve desde el mismo origen que el panel.
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff')
+  }));
 
-  app.use(session(config.session));
+  // El store entra acá, no en config.session: config no conoce el pool.
+  app.use(session({ ...config.session, store: sessionStore }));
 
   const tenantMiddleware = createTenantMiddleware({ repos });
   const publicRoutes = createPublicRouter();

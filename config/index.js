@@ -20,6 +20,22 @@ const DEFAULT_PORT = 3000;
 const DEFAULT_SUPER_EMAIL = 'admin@enelmapa.co';
 const DEFAULT_SUPER_PASS = 'super2026';
 
+// Límites de intentos de login por IP. El superadmin es más estricto: es una
+// sola cuenta conocida, así que nadie legítimo necesita muchos reintentos, y
+// es la que más daño hace si cae (hallazgo S5).
+const DEFAULT_RATE_WINDOW_MIN = 15;
+const DEFAULT_LOGIN_MAX = 10;
+const DEFAULT_SUPER_LOGIN_MAX = 5;
+
+// Devuelve un entero >= 0, o el default si no vino nada. Un 0 explícito
+// desactiva el limitador — lo usan los tests, que hacen decenas de logins
+// desde la misma IP.
+function intOrDefault(valor, porDefecto) {
+  if (valor === undefined || valor === '') return porDefecto;
+  const n = Number(valor);
+  return Number.isInteger(n) && n >= 0 ? n : porDefecto;
+}
+
 function loadConfig(env = process.env) {
   const nodeEnv = env.NODE_ENV || 'development';
   const isProduction = nodeEnv === 'production';
@@ -51,6 +67,11 @@ function loadConfig(env = process.env) {
       email: env.SUPER_EMAIL || DEFAULT_SUPER_EMAIL,
       passwordHash: env.SUPER_PASS_HASH || null,
       password: env.SUPER_PASS || DEFAULT_SUPER_PASS
+    },
+    rateLimit: {
+      windowMs: intOrDefault(env.RATE_LIMIT_WINDOW_MIN, DEFAULT_RATE_WINDOW_MIN) * 60 * 1000,
+      loginMax: intOrDefault(env.RATE_LIMIT_LOGIN_MAX, DEFAULT_LOGIN_MAX),
+      superadminMax: intOrDefault(env.RATE_LIMIT_SUPER_MAX, DEFAULT_SUPER_LOGIN_MAX)
     },
     session: buildSessionOptions(env)
   };

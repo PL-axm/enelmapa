@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const superRequired = require('../middleware/superauth');
 const asyncHandler = require('../middleware/asyncHandler');
+const { createLoginLimiter } = require('../middleware/rateLimit');
 const { verifySuperadmin } = require('../services/superadminAuth');
 const { NotFoundError } = require('../errors');
 
@@ -16,11 +17,19 @@ const { NotFoundError } = require('../errors');
 function createSuperadminRouter({ repos, config }) {
   const router = express.Router();
 
+  // Más estricto que el de /admin: es una sola cuenta conocida, nadie legítimo
+  // necesita muchos reintentos, y es la que más daño hace si cae.
+  const loginLimiter = createLoginLimiter({
+    windowMs: config.rateLimit.windowMs,
+    max: config.rateLimit.superadminMax,
+    mensaje: 'Demasiados intentos. Esperá unos minutos.'
+  });
+
   router.get('/login', (req, res) => {
     res.render('superadmin/login', { error: null });
   });
 
-  router.post('/login', (req, res) => {
+  router.post('/login', loginLimiter, (req, res) => {
     const { email, password } = req.body;
     if (verifySuperadmin({ email, password }, config.superadmin)) {
       req.session.isSuper = true;

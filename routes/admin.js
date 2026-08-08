@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const QRCode = require('qrcode');
 const authRequired = require('../middleware/auth');
 const asyncHandler = require('../middleware/asyncHandler');
+const { createLoginLimiter } = require('../middleware/rateLimit');
 
 // Sin `pool`: cada handler es leer la sesión, llamar a un repo y renderizar.
 // En la Fase 5 el QR se va a `qrService` (hoy duplicado con
@@ -11,11 +12,17 @@ const asyncHandler = require('../middleware/asyncHandler');
 function createAdminRouter({ repos, config }) {
   const router = express.Router();
 
+  const loginLimiter = createLoginLimiter({
+    windowMs: config.rateLimit.windowMs,
+    max: config.rateLimit.loginMax,
+    mensaje: 'Demasiados intentos de inicio de sesión. Esperá unos minutos.'
+  });
+
   router.get('/login', (req, res) => {
     res.render('admin/login', { error: null });
   });
 
-  router.post('/login', asyncHandler(async (req, res) => {
+  router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
     const { email, password } = req.body;
     const user = await repos.users.platform.findByEmailWithBusiness(email);
 

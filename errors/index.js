@@ -41,4 +41,12 @@ class NotFoundError extends AppError {
   }
 }
 
-module.exports = { AppError, ValidationError, UnauthorizedError, ForbiddenError, NotFoundError };
+class TooManyRequestsError extends AppError {
+  constructor(message = 'Demasiados intentos. Esperá unos minutos.') {
+    super(message, 429);
+  }
+}
+
+module.exports = {
+  AppError, ValidationError, UnauthorizedError, ForbiddenError, NotFoundError, TooManyRequestsError
+};
