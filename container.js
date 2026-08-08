@@ -1,5 +1,6 @@
 const { createPool } = require('./db/pool');
 const categoryRepository = require('./repositories/categoryRepository');
+const productRepository = require('./repositories/productRepository');
 
 // Composition root: el ÚNICO lugar del código que construye dependencias.
 // Todo lo demás las recibe.
@@ -22,8 +23,9 @@ const categoryRepository = require('./repositories/categoryRepository');
 // a tener una dependencia oculta que ningún test puede reemplazar.
 function buildRepos(db) {
   const categories = categoryRepository(db);
+  const products = productRepository(db, categories);
 
-  return { categories };
+  return { categories, products };
 }
 
 function createContainer(config) {

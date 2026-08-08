@@ -41,12 +41,12 @@ function createAdminRouter({ pool, repos, config }) {
   router.get('/dashboard', authRequired, asyncHandler(async (req, res) => {
     const [businesses] = await pool.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
     const categories = await repos.categories.forBusiness(req.session.businessId).count();
-    const [prodRows] = await pool.query('SELECT COUNT(*) as count FROM products WHERE business_id = ?', [req.session.businessId]);
+    const products = await repos.products.forBusiness(req.session.businessId).count();
 
     res.render('admin/dashboard', {
       session: req.session,
       business: businesses[0],
-      stats: { categories, products: prodRows[0].count }
+      stats: { categories, products }
     });
   }));
 
@@ -66,14 +66,9 @@ function createAdminRouter({ pool, repos, config }) {
   }));
 
   router.get('/products', authRequired, asyncHandler(async (req, res) => {
-    const categories = await repos.categories.forBusiness(req.session.businessId).listOrdered();
-    const [products] = await pool.query(`
-      SELECT p.*, c.name as category_name
-      FROM products p
-      JOIN categories c ON p.category_id = c.id
-      WHERE p.business_id = ?
-      ORDER BY c.sort_order, p.sort_order
-    `, [req.session.businessId]);
+    const scope = req.session.businessId;
+    const categories = await repos.categories.forBusiness(scope).listOrdered();
+    const products = await repos.products.forBusiness(scope).listWithCategory();
 
     res.render('admin/products', { session: req.session, categories, products });
   }));

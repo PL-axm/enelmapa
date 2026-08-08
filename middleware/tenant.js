@@ -29,7 +29,7 @@ function createTenantMiddleware({ pool, repos }) {
     const business = businesses[0];
     const [hours] = await pool.query('SELECT * FROM business_hours WHERE business_id = ? ORDER BY day_index', [business.id]);
     const categories = await repos.categories.forBusiness(business.id).listOrdered();
-    const [products] = await pool.query('SELECT * FROM products WHERE business_id = ? AND is_active = 1 ORDER BY sort_order', [business.id]);
+    const products = await repos.products.forBusiness(business.id).listActive();
 
     req.business = business;
     req.businessHours = hours;

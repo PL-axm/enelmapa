@@ -5,7 +5,7 @@ const fs = require('fs');
 const QRCode = require('qrcode');
 const authRequired = require('../../middleware/auth');
 const asyncHandler = require('../../middleware/asyncHandler');
-const { ValidationError, ForbiddenError } = require('../../errors');
+const { ValidationError } = require('../../errors');
 
 // Un :id no numérico llega tal cual al SQL (`WHERE id = 'abc'`) y MySQL
 // responde ER_TRUNCATED_WRONG_VALUE. Se corta acá, en el borde, para que ni
@@ -19,23 +19,6 @@ function requireIntParam(name) {
     req.params[name] = value;
     next();
   };
-}
-
-// El scoping por business_id en el WHERE protege las filas que ya existen,
-// pero no sirve para un category_id que viene del cliente y se va a ESCRIBIR:
-// ahí hay que confirmar la pertenencia antes. Devuelve el id ya normalizado a
-// entero, o null si no es válido o no es de este negocio.
-//
-// La consulta ya vive en el repo; lo que queda acá es la normalización a
-// entero. Cuando se migre `products` esto desaparece del todo: la validación
-// pasa adentro de `productRepository.forBusiness().create()`, que es donde
-// olvidarla deja de ser posible.
-async function resolveOwnCategoryId(categoryRepo, rawCategoryId, businessId) {
-  const categoryId = Number(rawCategoryId);
-  if (!Number.isInteger(categoryId) || categoryId <= 0) return null;
-
-  const owns = await categoryRepo.forBusiness(businessId).exists(categoryId);
-  return owns ? categoryId : null;
 }
 
 function requireOrderArray(order) {
@@ -139,57 +122,49 @@ function createApiRouter({ pool, repos, config }) {
   }));
 
   // === PRODUCTS ===
+  // La pertenencia del category_id ya no se valida acá: la fuerza el repo
+  // adentro de create/update, que es donde no se puede olvidar (B2/B3).
+  const uploadedPath = (req) => req.file
+    ? '/uploads/' + req.session.businessId + '/' + req.file.filename
+    : '';
+
   router.post('/products', authRequired, upload.single('image'), asyncHandler(async (req, res) => {
     const { name, description, price, category_id } = req.body;
 
-    const categoryId = await resolveOwnCategoryId(repos.categories, category_id, req.session.businessId);
-    if (categoryId === null) {
-      throw new ForbiddenError('La categoría no pertenece a este negocio');
-    }
+    const id = await repos.products.forBusiness(req.session.businessId).create({
+      name,
+      description,
+      price: parseFloat(price),
+      categoryId: category_id,
+      image: uploadedPath(req)
+    });
 
-    const image = req.file ? '/uploads/' + req.session.businessId + '/' + req.file.filename : '';
-    const [maxRows] = await pool.query('SELECT COALESCE(MAX(sort_order), 0) + 1 as next FROM products WHERE category_id = ? AND business_id = ?', [categoryId, req.session.businessId]);
-
-    const [result] = await pool.query(
-      'INSERT INTO products (business_id, category_id, name, description, price, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.session.businessId, categoryId, name, description || '', parseFloat(price), image, maxRows[0].next]
-    );
-
-    res.json({ ok: true, id: result.insertId });
+    res.json({ ok: true, id });
   }));
 
   router.put('/products/reorder', authRequired, asyncHandler(async (req, res) => {
     const order = requireOrderArray(req.body.order);
-    for (let i = 0; i < order.length; i++) {
-      await pool.query('UPDATE products SET sort_order = ? WHERE id = ? AND business_id = ?', [i, Number(order[i]) || 0, req.session.businessId]);
-    }
+    await repos.products.forBusiness(req.session.businessId).reorder(order);
     res.json({ ok: true });
   }));
 
   router.put('/products/:id', authRequired, requireIntParam('id'), upload.single('image'), asyncHandler(async (req, res) => {
     const { name, description, price, category_id, is_active } = req.body;
 
-    // El WHERE de abajo garantiza que el producto sea de este negocio, pero sin
-    // esto se podría mover un producto propio a una categoría ajena.
-    const categoryId = await resolveOwnCategoryId(repos.categories, category_id, req.session.businessId);
-    if (categoryId === null) {
-      throw new ForbiddenError('La categoría no pertenece a este negocio');
-    }
+    await repos.products.forBusiness(req.session.businessId).update(req.params.id, {
+      name,
+      description,
+      price: parseFloat(price),
+      categoryId: category_id,
+      isActive: is_active !== '0',
+      image: uploadedPath(req)
+    });
 
-    const fields = { name, description: description || '', price: parseFloat(price), category_id: categoryId, is_active: is_active !== '0' ? 1 : 0 };
-    if (req.file) fields.image = '/uploads/' + req.session.businessId + '/' + req.file.filename;
-
-    const keys = Object.keys(fields);
-    const sets = keys.map(k => k + ' = ?').join(', ');
-    const values = keys.map(k => fields[k]);
-    values.push(req.params.id, req.session.businessId);
-
-    await pool.query('UPDATE products SET ' + sets + ' WHERE id = ? AND business_id = ?', values);
     res.json({ ok: true });
   }));
 
   router.delete('/products/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
-    await pool.query('DELETE FROM products WHERE id = ? AND business_id = ?', [req.params.id, req.session.businessId]);
+    await repos.products.forBusiness(req.session.businessId).remove(req.params.id);
     res.json({ ok: true });
   }));
 
