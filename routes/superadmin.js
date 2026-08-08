@@ -4,11 +4,16 @@ const superRequired = require('../middleware/superauth');
 const asyncHandler = require('../middleware/asyncHandler');
 const { verifySuperadmin } = require('../services/superadminAuth');
 
-// Recibe el pool y `config.superadmin` (las credenciales del operador de
-// plataforma). En la Fase 5, el alta de negocio+horarios de POST /create pasa
-// a `businessService.createWithDefaults()`, que hoy está duplicado con
-// db/seed.js — incluyendo el array de días (hallazgo E3).
-function createSuperadminRouter({ pool, config }) {
+// Este router es el único que usa `repos.businesses.platform`, la superficie
+// que cruza negocios a propósito: el superadmin puede crear, editar y borrar
+// cualquiera. Que esas llamadas se lean distinto de las scopeadas es
+// deliberado — ver el comentario de businessRepository.
+//
+// `pool` queda sólo para las queries de `users`, que se van con ese recurso.
+// En la Fase 5, el alta de negocio+admin+horarios pasa a
+// `businessService.createWithDefaults()` envuelto en `withTransaction`, que es
+// lo que hoy deja negocios huérfanos si el email del admin ya existe.
+function createSuperadminRouter({ pool, repos, config }) {
   const router = express.Router();
 
   router.get('/login', (req, res) => {
@@ -30,13 +35,7 @@ function createSuperadminRouter({ pool, config }) {
   });
 
   router.get('/', superRequired, asyncHandler(async (req, res) => {
-    const [businesses] = await pool.query(`
-      SELECT b.*,
-        (SELECT COUNT(*) FROM categories WHERE business_id = b.id) as cat_count,
-        (SELECT COUNT(*) FROM products WHERE business_id = b.id) as prod_count,
-        (SELECT email FROM users WHERE business_id = b.id LIMIT 1) as admin_email
-      FROM businesses b ORDER BY b.created_at DESC
-    `);
+    const businesses = await repos.businesses.platform.listWithCounts();
     res.render('superadmin/dashboard', { businesses });
   }));
 
@@ -47,43 +46,42 @@ function createSuperadminRouter({ pool, config }) {
   router.post('/create', superRequired, asyncHandler(async (req, res) => {
     const { slug, name, address, phone, whatsapp, instagram, facebook, tiktok, admin_email, admin_password, admin_name } = req.body;
 
-    const [existing] = await pool.query('SELECT id FROM businesses WHERE slug = ?', [slug]);
-    if (existing.length > 0) {
+    if (await repos.businesses.platform.slugExists(slug)) {
       return res.render('superadmin/create', { error: 'El slug "' + slug + '" ya existe' });
     }
 
-    const [bizResult] = await pool.query(
-      'INSERT INTO businesses (slug, name, address, phone, whatsapp, instagram, facebook, tiktok, is_open) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)',
-      [slug, name, address || '', phone || '', whatsapp || '', instagram || '', facebook || '', tiktok || '']
-    );
-    const bizId = bizResult.insertId;
+    // OJO: estas tres escrituras todavía NO son atómicas. Si el email del
+    // admin ya existe, el negocio queda creado sin admin ni horarios y con el
+    // slug ocupado. La costura para arreglarlo (`withTransaction`) ya está en
+    // container.js; se usa en la Fase 5, cuando exista businessService.
+    const bizId = await repos.businesses.platform.create({
+      slug, name, address, phone, whatsapp, instagram, facebook, tiktok
+    });
 
     const hash = bcrypt.hashSync(admin_password, 10);
     await pool.query('INSERT INTO users (business_id, email, password_hash, name) VALUES (?, ?, ?, ?)',
       [bizId, admin_email, hash, admin_name || 'Administrador']);
 
-    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    for (let i = 0; i < days.length; i++) {
-      await pool.query('INSERT INTO business_hours (business_id, day_index, day_name, open_time, close_time) VALUES (?, ?, ?, ?, ?)',
-        [bizId, i, days[i], '08:00', '20:00']);
-    }
+    await repos.businesses.platform.createDefaultHours(bizId);
 
     res.redirect('/superadmin');
   }));
 
   router.get('/edit/:id', superRequired, asyncHandler(async (req, res) => {
-    const [businesses] = await pool.query('SELECT * FROM businesses WHERE id = ?', [req.params.id]);
-    if (businesses.length === 0) return res.redirect('/superadmin');
+    const business = await repos.businesses.platform.findById(req.params.id);
+    if (!business) return res.redirect('/superadmin');
     const [users] = await pool.query('SELECT id, email, name FROM users WHERE business_id = ?', [req.params.id]);
-    res.render('superadmin/edit', { business: businesses[0], users });
+    res.render('superadmin/edit', { business, users });
   }));
 
   router.post('/edit/:id', superRequired, asyncHandler(async (req, res) => {
     const { slug, name, address, phone, whatsapp, instagram, facebook, tiktok, is_open } = req.body;
-    await pool.query(
-      'UPDATE businesses SET slug=?, name=?, address=?, phone=?, whatsapp=?, instagram=?, facebook=?, tiktok=?, is_open=? WHERE id=?',
-      [slug, name, address || '', phone || '', whatsapp || '', instagram || '', facebook || '', tiktok || '', is_open ? 1 : 0, req.params.id]
-    );
+    await repos.businesses.platform.update(req.params.id, {
+      slug, name,
+      address: address || '', phone: phone || '', whatsapp: whatsapp || '',
+      instagram: instagram || '', facebook: facebook || '', tiktok: tiktok || '',
+      is_open: is_open ? 1 : 0
+    });
     res.redirect('/superadmin');
   }));
 
@@ -96,7 +94,7 @@ function createSuperadminRouter({ pool, config }) {
   }));
 
   router.post('/delete/:id', superRequired, asyncHandler(async (req, res) => {
-    await pool.query('DELETE FROM businesses WHERE id = ?', [req.params.id]);
+    await repos.businesses.platform.remove(req.params.id);
     res.redirect('/superadmin');
   }));
 

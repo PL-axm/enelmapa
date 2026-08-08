@@ -4,6 +4,7 @@ const fs = require('fs');
 const { initDb } = require('./schema');
 const { createPool } = require('./pool');
 const { loadConfig } = require('../config');
+const { DAYS } = require('../repositories/businessRepository');
 
 const menuData = [
   {
@@ -203,9 +204,10 @@ async function seed() {
   const hash = bcrypt.hashSync('admin123', 10);
   await db.query('INSERT INTO users (business_id, email, password_hash, name) VALUES (?, ?, ?, ?)', [bizId, 'admin@caficultor.com', hash, 'Administrador']);
 
-  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  for (let i = 0; i < days.length; i++) {
-    await db.query('INSERT INTO business_hours (business_id, day_index, day_name, open_time, close_time) VALUES (?, ?, ?, ?, ?)', [bizId, i, days[i], i === 5 ? '07:00' : '07:30', '20:00']);
+  // DAYS sale del repo: estaba escrito acá y en routes/superadmin.js, así que
+  // cambiarlo en uno y olvidar el otro era cuestión de tiempo (hallazgo E3).
+  for (let i = 0; i < DAYS.length; i++) {
+    await db.query('INSERT INTO business_hours (business_id, day_index, day_name, open_time, close_time) VALUES (?, ?, ?, ?, ?)', [bizId, i, DAYS[i], i === 5 ? '07:00' : '07:30', '20:00']);
   }
 
   for (let ci = 0; ci < menuData.length; ci++) {

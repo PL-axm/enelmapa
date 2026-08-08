@@ -33,7 +33,7 @@ function createApp({ pool, repos, config }) {
 
   app.use(session(config.session));
 
-  const tenantMiddleware = createTenantMiddleware({ pool, repos });
+  const tenantMiddleware = createTenantMiddleware({ repos });
   const publicRoutes = createPublicRouter();
 
   app.use((req, res, next) => {
@@ -51,13 +51,13 @@ function createApp({ pool, repos, config }) {
   });
 
   app.use('/admin', createAdminRouter({ pool, repos, config }));
-  app.use('/superadmin', createSuperadminRouter({ pool, config }));
-  app.use('/api', createApiRouter({ pool, repos, config }));
+  app.use('/superadmin', createSuperadminRouter({ pool, repos, config }));
+  app.use('/api', createApiRouter({ repos, config }));
 
   app.get('/s/:slug', tenantMiddleware, publicRoutes);
 
   app.get('/', asyncHandler(async (req, res) => {
-    const [businesses] = await pool.query('SELECT slug, name, logo_img FROM businesses ORDER BY name');
+    const businesses = await repos.businesses.platform.listForHome();
     res.render('home', { businesses });
   }));
 

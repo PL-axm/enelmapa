@@ -28,11 +28,10 @@ function requireOrderArray(order) {
   return order;
 }
 
-// `pool` y `repos` conviven mientras dure la Fase 4: categorías ya salió, y
-// productos/negocio/horarios siguen con SQL inline hasta que les toque. Al
-// cerrar la fase `pool` desaparece de esta firma y los handlers quedan como
-// cableado puro: validar → llamar al repo → responder.
-function createApiRouter({ pool, repos, config }) {
+// Sin `pool`: no queda una sola query inline acá. Los handlers son cableado
+// puro — leer la request, llamar al repo, responder. El scope de tenant entra
+// una vez por handler, en `forBusiness(req.session.businessId)`.
+function createApiRouter({ repos, config }) {
   const router = express.Router();
 
   const storage = multer.diskStorage({
@@ -59,17 +58,17 @@ function createApiRouter({ pool, repos, config }) {
     if (req.files?.banner) banner_img = '/uploads/' + req.session.businessId + '/' + req.files.banner[0].filename;
     if (req.files?.logo) logo_img = '/uploads/' + req.session.businessId + '/' + req.files.logo[0].filename;
 
-    const menu_theme = req.body.menu_theme || 'light';
-    const fields = { name, address, phone, whatsapp, instagram, facebook, tiktok, is_open: is_open ? 1 : 0, menu_theme };
-    if (banner_img) fields.banner_img = banner_img;
-    if (logo_img) fields.logo_img = logo_img;
+    const scope = repos.businesses.forBusiness(req.session.businessId);
 
-    const keys = Object.keys(fields);
-    const sets = keys.map(k => k + ' = ?').join(', ');
-    const values = keys.map(k => fields[k]);
-    values.push(req.session.businessId);
-
-    await pool.query('UPDATE businesses SET ' + sets + ' WHERE id = ?', values);
+    // El repo filtra por lista blanca: aunque el cliente mande `slug` o `id`
+    // en el formulario, desde acá no se pueden tocar.
+    await scope.update({
+      name, address, phone, whatsapp, instagram, facebook, tiktok,
+      is_open: is_open ? 1 : 0,
+      menu_theme: req.body.menu_theme || 'light',
+      banner_img,
+      logo_img
+    });
 
     if (req.body.hours) {
       let hours;
@@ -78,10 +77,7 @@ function createApiRouter({ pool, repos, config }) {
       } catch (err) {
         throw new ValidationError('El campo "hours" no es JSON válido');
       }
-      for (const h of hours) {
-        await pool.query('UPDATE business_hours SET open_time = ?, close_time = ?, is_closed = ? WHERE business_id = ? AND day_index = ?',
-          [h.open_time, h.close_time, h.is_closed ? 1 : 0, req.session.businessId, h.day_index]);
-      }
+      await scope.updateHours(hours);
     }
 
     req.session.businessName = name;
@@ -170,9 +166,9 @@ function createApiRouter({ pool, repos, config }) {
 
   // === QR CODE ===
   router.get('/qr', authRequired, asyncHandler(async (req, res) => {
-    const [businesses] = await pool.query('SELECT slug FROM businesses WHERE id = ?', [req.session.businessId]);
+    const business = await repos.businesses.forBusiness(req.session.businessId).get();
     const size = parseInt(req.query.size) || 300;
-    const menuUrl = 'https://' + config.domain + '/s/' + businesses[0].slug;
+    const menuUrl = 'https://' + config.domain + '/s/' + business.slug;
     const qr = await QRCode.toDataURL(menuUrl, { width: size, margin: 2, color: { dark: '#1A1A18', light: '#FFFFFF' } });
     res.json({ qr });
   }));

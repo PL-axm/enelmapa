@@ -4,10 +4,10 @@ const QRCode = require('qrcode');
 const authRequired = require('../middleware/auth');
 const asyncHandler = require('../middleware/asyncHandler');
 
-// Recibe sólo lo que usa. `pool` y `repos` conviven mientras dure la Fase 4:
-// categorías ya sale del repo, el resto todavía es SQL inline. En la Fase 5 el
-// QR se va a `qrService`, que hoy está duplicado con routes/api/index.js
-// (hallazgo E3).
+// `pool` queda sólo para la query de login, que es de `users` — se va cuando
+// se migre ese recurso, y ahí desaparece de esta firma. Todo lo demás ya sale
+// de repositories. En la Fase 5 el QR se va a `qrService`, que hoy sigue
+// duplicado con routes/api/index.js (hallazgo E3).
 function createAdminRouter({ pool, repos, config }) {
   const router = express.Router();
 
@@ -39,22 +39,20 @@ function createAdminRouter({ pool, repos, config }) {
   });
 
   router.get('/dashboard', authRequired, asyncHandler(async (req, res) => {
-    const [businesses] = await pool.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
-    const categories = await repos.categories.forBusiness(req.session.businessId).count();
-    const products = await repos.products.forBusiness(req.session.businessId).count();
+    const scope = req.session.businessId;
+    const business = await repos.businesses.forBusiness(scope).get();
+    const categories = await repos.categories.forBusiness(scope).count();
+    const products = await repos.products.forBusiness(scope).count();
 
-    res.render('admin/dashboard', {
-      session: req.session,
-      business: businesses[0],
-      stats: { categories, products }
-    });
+    res.render('admin/dashboard', { session: req.session, business, stats: { categories, products } });
   }));
 
   router.get('/settings', authRequired, asyncHandler(async (req, res) => {
-    const [businesses] = await pool.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
-    const [hours] = await pool.query('SELECT * FROM business_hours WHERE business_id = ? ORDER BY day_index', [req.session.businessId]);
+    const scope = repos.businesses.forBusiness(req.session.businessId);
+    const business = await scope.get();
+    const hours = await scope.hours();
 
-    res.render('admin/settings', { session: req.session, business: businesses[0], hours });
+    res.render('admin/settings', { session: req.session, business, hours });
   }));
 
   router.get('/categories', authRequired, asyncHandler(async (req, res) => {
@@ -74,8 +72,7 @@ function createAdminRouter({ pool, repos, config }) {
   }));
 
   router.get('/qr', authRequired, asyncHandler(async (req, res) => {
-    const [businesses] = await pool.query('SELECT * FROM businesses WHERE id = ?', [req.session.businessId]);
-    const business = businesses[0];
+    const business = await repos.businesses.forBusiness(req.session.businessId).get();
     const menuUrl = 'https://' + config.domain + '/s/' + business.slug;
     const qrDataUrl = await QRCode.toDataURL(menuUrl, { width: 300, margin: 2, color: { dark: '#1A1A18', light: '#FFFFFF' } });
     res.render('admin/qr', { session: req.session, business, menuUrl, qrDataUrl });

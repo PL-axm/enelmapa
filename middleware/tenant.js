@@ -10,9 +10,11 @@ const { NotFoundError } = require('../errors');
 // delega en el error handler central, que es el único que decide qué status
 // y qué formato corresponde.
 //
-// Fase 4 en curso: las categorías ya salen del repo; horarios y productos
-// todavía usan el pool y se migran con sus respectivos recursos.
-function createTenantMiddleware({ pool, repos }) {
+// Sin `pool`: resolver el tenant es ahora tres llamadas a repositories. Nótese
+// que `findBySlug` vive en la superficie de plataforma a propósito — este
+// middleware corre ANTES de saber qué negocio es, así que no hay scope todavía;
+// a partir de ahí, todo lo demás ya va scopeado por `business.id`.
+function createTenantMiddleware({ repos }) {
   return asyncHandler(async (req, res, next) => {
     const slug = req.params.slug || getSubdomain(req.hostname);
 
@@ -20,14 +22,13 @@ function createTenantMiddleware({ pool, repos }) {
       throw new NotFoundError('Negocio no encontrado');
     }
 
-    const [businesses] = await pool.query('SELECT * FROM businesses WHERE slug = ?', [slug]);
+    const business = await repos.businesses.platform.findBySlug(slug);
 
-    if (businesses.length === 0) {
+    if (!business) {
       throw new NotFoundError('Negocio no encontrado');
     }
 
-    const business = businesses[0];
-    const [hours] = await pool.query('SELECT * FROM business_hours WHERE business_id = ? ORDER BY day_index', [business.id]);
+    const hours = await repos.businesses.forBusiness(business.id).hours();
     const categories = await repos.categories.forBusiness(business.id).listOrdered();
     const products = await repos.products.forBusiness(business.id).listActive();
 
