@@ -9,11 +9,10 @@ const { verifySuperadmin } = require('../services/superadminAuth');
 // cualquiera. Que esas llamadas se lean distinto de las scopeadas es
 // deliberado — ver el comentario de businessRepository.
 //
-// `pool` queda sólo para las queries de `users`, que se van con ese recurso.
 // En la Fase 5, el alta de negocio+admin+horarios pasa a
 // `businessService.createWithDefaults()` envuelto en `withTransaction`, que es
 // lo que hoy deja negocios huérfanos si el email del admin ya existe.
-function createSuperadminRouter({ pool, repos, config }) {
+function createSuperadminRouter({ repos, config }) {
   const router = express.Router();
 
   router.get('/login', (req, res) => {
@@ -58,9 +57,11 @@ function createSuperadminRouter({ pool, repos, config }) {
       slug, name, address, phone, whatsapp, instagram, facebook, tiktok
     });
 
-    const hash = bcrypt.hashSync(admin_password, 10);
-    await pool.query('INSERT INTO users (business_id, email, password_hash, name) VALUES (?, ?, ?, ?)',
-      [bizId, admin_email, hash, admin_name || 'Administrador']);
+    await repos.users.forBusiness(bizId).create({
+      email: admin_email,
+      passwordHash: bcrypt.hashSync(admin_password, 10),
+      name: admin_name
+    });
 
     await repos.businesses.platform.createDefaultHours(bizId);
 
@@ -70,7 +71,7 @@ function createSuperadminRouter({ pool, repos, config }) {
   router.get('/edit/:id', superRequired, asyncHandler(async (req, res) => {
     const business = await repos.businesses.platform.findById(req.params.id);
     if (!business) return res.redirect('/superadmin');
-    const [users] = await pool.query('SELECT id, email, name FROM users WHERE business_id = ?', [req.params.id]);
+    const users = await repos.users.forBusiness(business.id).list();
     res.render('superadmin/edit', { business, users });
   }));
 
@@ -87,10 +88,10 @@ function createSuperadminRouter({ pool, repos, config }) {
 
   router.post('/reset-password/:userId', superRequired, asyncHandler(async (req, res) => {
     const { new_password } = req.body;
-    const hash = bcrypt.hashSync(new_password, 10);
-    await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, req.params.userId]);
-    const [users] = await pool.query('SELECT business_id FROM users WHERE id = ?', [req.params.userId]);
-    res.redirect('/superadmin/edit/' + users[0].business_id);
+    await repos.users.platform.setPassword(req.params.userId, bcrypt.hashSync(new_password, 10));
+
+    const user = await repos.users.platform.findById(req.params.userId);
+    res.redirect('/superadmin/edit/' + user.business_id);
   }));
 
   router.post('/delete/:id', superRequired, asyncHandler(async (req, res) => {

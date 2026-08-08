@@ -16,10 +16,11 @@ const { getSubdomain } = require('./services/subdomain');
 // recibe las dependencias y las reparte: cada pieza declara en su firma lo
 // que necesita, y nadie recibe el container entero (ver container.js).
 //
-// `pool` y `repos` conviven mientras dure la Fase 4: `repos` para los recursos
-// ya migrados, `pool` para el SQL inline que queda. Al cerrar la fase, `pool`
-// tiene que desaparecer de las firmas de los routers.
-function createApp({ pool, repos, config }) {
+// Ningún router recibe ya el pool: al cerrar la Fase 4 no queda SQL fuera de
+// repositories/, así que la app se arma sólo con repos y config. Que `pool` no
+// aparezca en ninguna firma de router es la señal de que la migración está
+// completa.
+function createApp({ repos, config }) {
   const app = express();
 
   app.set('view engine', 'ejs');
@@ -50,8 +51,8 @@ function createApp({ pool, repos, config }) {
     next();
   });
 
-  app.use('/admin', createAdminRouter({ pool, repos, config }));
-  app.use('/superadmin', createSuperadminRouter({ pool, repos, config }));
+  app.use('/admin', createAdminRouter({ repos, config }));
+  app.use('/superadmin', createSuperadminRouter({ repos, config }));
   app.use('/api', createApiRouter({ repos, config }));
 
   app.get('/s/:slug', tenantMiddleware, publicRoutes);

@@ -4,11 +4,11 @@ const QRCode = require('qrcode');
 const authRequired = require('../middleware/auth');
 const asyncHandler = require('../middleware/asyncHandler');
 
-// `pool` queda sólo para la query de login, que es de `users` — se va cuando
-// se migre ese recurso, y ahí desaparece de esta firma. Todo lo demás ya sale
-// de repositories. En la Fase 5 el QR se va a `qrService`, que hoy sigue
-// duplicado con routes/api/index.js (hallazgo E3).
-function createAdminRouter({ pool, repos, config }) {
+// Sin `pool`: cada handler es leer la sesión, llamar a un repo y renderizar.
+// En la Fase 5 el QR se va a `qrService` (hoy duplicado con
+// routes/api/index.js, hallazgo E3) y la comparación de bcrypt del login a
+// `authService`.
+function createAdminRouter({ repos, config }) {
   const router = express.Router();
 
   router.get('/login', (req, res) => {
@@ -17,13 +17,12 @@ function createAdminRouter({ pool, repos, config }) {
 
   router.post('/login', asyncHandler(async (req, res) => {
     const { email, password } = req.body;
-    const [users] = await pool.query('SELECT u.*, b.name as business_name, b.slug FROM users u JOIN businesses b ON u.business_id = b.id WHERE u.email = ?', [email]);
+    const user = await repos.users.platform.findByEmailWithBusiness(email);
 
-    if (users.length === 0 || !bcrypt.compareSync(password, users[0].password_hash)) {
+    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
       return res.render('admin/login', { error: 'Credenciales incorrectas' });
     }
 
-    const user = users[0];
     req.session.userId = user.id;
     req.session.businessId = user.business_id;
     req.session.userName = user.name;
