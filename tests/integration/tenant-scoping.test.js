@@ -56,12 +56,14 @@ describe('tenant scoping (business_id)', () => {
       .put('/api/categories/' + businessB.categoryId)
       .send({ name: 'Hackeado por A' });
 
-    // El WHERE incluye "AND business_id = ?" — no matchea ninguna fila de
-    // A, así que el UPDATE afecta 0 filas, pero la ruta igual responde
-    // {ok:true} (no distingue "actualizó algo" de "no encontró nada").
-    // Lo que importa para la seguridad es el estado real en DB, no el
-    // código HTTP.
-    expect(res.status).toBe(200);
+    // Cambió al cerrar B4: el WHERE incluye "AND business_id = ?", así que el
+    // UPDATE afecta 0 filas y ahora eso se responde como 404 en vez de un
+    // {ok:true} falso.
+    //
+    // Es 404 y no 403 a propósito: un 403 confirmaría que ese id existe en
+    // otro negocio, y con eso se podrían enumerar los datos ajenos.
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ ok: false, error: 'Categoría no encontrada' });
 
     const db = getTestPool();
     const [rows] = await db.query('SELECT name FROM categories WHERE id = ?', [businessB.categoryId]);
@@ -70,7 +72,7 @@ describe('tenant scoping (business_id)', () => {
 
   test('DELETE /api/categories/:id de A sobre una categoría de B no la borra', async () => {
     const res = await agentA.delete('/api/categories/' + businessB.categoryId);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
 
     const db = getTestPool();
     const [rows] = await db.query('SELECT id FROM categories WHERE id = ?', [businessB.categoryId]);
@@ -102,7 +104,8 @@ describe('tenant scoping (business_id)', () => {
       .field('price', '1')
       .field('category_id', String(businessA.categoryId));
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ ok: false, error: 'Producto no encontrado' });
 
     const db = getTestPool();
     const [rows] = await db.query('SELECT name FROM products WHERE id = ?', [businessB.productId]);
@@ -111,7 +114,7 @@ describe('tenant scoping (business_id)', () => {
 
   test('DELETE /api/products/:id de A sobre un producto de B no lo borra', async () => {
     const res = await agentA.delete('/api/products/' + businessB.productId);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
 
     const db = getTestPool();
     const [rows] = await db.query('SELECT id FROM products WHERE id = ?', [businessB.productId]);
@@ -161,6 +164,42 @@ describe('tenant scoping (business_id)', () => {
     const db = getTestPool();
     const [rows] = await db.query('SELECT category_id FROM products WHERE id = ?', [businessA.productId]);
     expect(rows[0].category_id).toBe(businessA.categoryId);
+  });
+
+  // Cierre de B4: hasta ahora una escritura sobre algo que no existe respondía
+  // {ok:true} igual que una exitosa, así que el panel no podía avisar de nada.
+  describe('escrituras sobre filas inexistentes (B4)', () => {
+    test('PUT sobre una categoría propia inexistente responde 404', async () => {
+      const res = await agentA.put('/api/categories/999999').send({ name: 'Fantasma' });
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ ok: false, error: 'Categoría no encontrada' });
+    });
+
+    test('DELETE sobre una categoría inexistente responde 404', async () => {
+      expect((await agentA.delete('/api/categories/999999')).status).toBe(404);
+    });
+
+    test('DELETE sobre un producto inexistente responde 404', async () => {
+      expect((await agentA.delete('/api/products/999999')).status).toBe(404);
+    });
+
+    // El id ajeno y el inexistente tienen que ser indistinguibles desde afuera:
+    // si difirieran, se podría enumerar qué ids existen en otros negocios.
+    test('un id ajeno y uno inexistente responden exactamente igual', async () => {
+      const ajeno = await agentA.delete('/api/categories/' + businessB.categoryId);
+      const inexistente = await agentA.delete('/api/categories/999999');
+
+      expect(ajeno.status).toBe(inexistente.status);
+      expect(ajeno.body).toEqual(inexistente.body);
+    });
+
+    test('las operaciones válidas siguen respondiendo ok', async () => {
+      const res = await agentA.put('/api/categories/' + businessA.categoryId).send({ name: 'Renombrada' });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ ok: true });
+    });
   });
 
   test('POST /api/products con un category_id inexistente se rechaza', async () => {

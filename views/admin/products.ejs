@@ -128,7 +128,7 @@ function saveProdOrder() {
   var rows = document.querySelectorAll('.drag-row');
   var order = [];
   rows.forEach(function(r) { order.push(parseInt(r.dataset.id)); });
-  fetch('/api/products/reorder', {
+  apiFetch('/api/products/reorder', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ order: order })
@@ -179,14 +179,12 @@ document.getElementById('prodForm').addEventListener('submit', async function(e)
 
   var url = id ? '/api/products/' + id : '/api/products';
   var method = id ? 'PUT' : 'POST';
-  await fetch(url, { method: method, body: fd });
-  location.reload();
+  await apiFetchThenReload(url, { method: method, body: fd });
 });
 
 async function deleteProd(id, name) {
   if (!confirm('Eliminar "' + name + '"?')) return;
-  await fetch('/api/products/' + id, { method: 'DELETE' });
-  location.reload();
+  await apiFetchThenReload('/api/products/' + id, { method: 'DELETE' });
 }
 
 document.getElementById('prodImage').addEventListener('change', function() {

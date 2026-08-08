@@ -1,11 +1,9 @@
 const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const QRCode = require('qrcode');
+const { createUploader, verificarImagenes, traducirErroresDeSubida } = require('../../services/imageUpload');
 const authRequired = require('../../middleware/auth');
 const asyncHandler = require('../../middleware/asyncHandler');
-const { ValidationError } = require('../../errors');
+const { ValidationError, NotFoundError } = require('../../errors');
 
 // Un :id no numérico llega tal cual al SQL (`WHERE id = 'abc'`) y MySQL
 // responde ER_TRUNCATED_WRONG_VALUE. Se corta acá, en el borde, para que ni
@@ -21,6 +19,19 @@ function requireIntParam(name) {
   };
 }
 
+// Los repos devuelven si la escritura afectó alguna fila. Hasta acá eso se
+// ignoraba y todo respondía {ok:true}, así que "no existe", "no es tuyo" y
+// "listo" se veían igual desde el panel (hallazgo B4).
+//
+// Se responde 404 en los dos casos de fallo, y es a propósito: distinguir "no
+// existe" de "no es tuyo" con un 403 confirmaría que ese id existe en OTRO
+// negocio. Un enumerador podría mapear qué ids están ocupados recorriendo la
+// ruta. Como el repo ya scopea por business_id, "no lo encontré dentro de tu
+// negocio" es además la descripción honesta de lo que pasó.
+function requireAffected(afectó, mensaje) {
+  if (!afectó) throw new NotFoundError(mensaje);
+}
+
 function requireOrderArray(order) {
   if (!Array.isArray(order)) {
     throw new ValidationError('Se esperaba un array "order"');
@@ -34,24 +45,13 @@ function requireOrderArray(order) {
 function createApiRouter({ repos, config }) {
   const router = express.Router();
 
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      const dir = path.join(__dirname, '../../uploads', String(req.session.businessId));
-      fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      cb(null, Date.now() + '-' + Math.random().toString(36).substring(2, 8) + ext);
-    }
-  });
-  const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+  const upload = createUploader();
 
   // === BUSINESS SETTINGS ===
   router.post('/settings', authRequired, upload.fields([
     { name: 'banner', maxCount: 1 },
     { name: 'logo', maxCount: 1 }
-  ]), asyncHandler(async (req, res) => {
+  ]), verificarImagenes, asyncHandler(async (req, res) => {
     const { name, address, phone, whatsapp, instagram, facebook, tiktok, is_open } = req.body;
 
     let banner_img, logo_img;
@@ -103,17 +103,16 @@ function createApiRouter({ repos, config }) {
     res.json({ ok: true });
   }));
 
-  // `rename`/`remove` devuelven si afectaron alguna fila, pero acá todavía se
-  // ignora: distinguir "no existe" de "no es tuyo" de "listo" es B4, que
-  // cambia el contrato de /api y va en su propia rama.
   router.put('/categories/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
     const { name } = req.body;
-    await repos.categories.forBusiness(req.session.businessId).rename(req.params.id, name);
+    const afectó = await repos.categories.forBusiness(req.session.businessId).rename(req.params.id, name);
+    requireAffected(afectó, 'Categoría no encontrada');
     res.json({ ok: true });
   }));
 
   router.delete('/categories/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
-    await repos.categories.forBusiness(req.session.businessId).remove(req.params.id);
+    const afectó = await repos.categories.forBusiness(req.session.businessId).remove(req.params.id);
+    requireAffected(afectó, 'Categoría no encontrada');
     res.json({ ok: true });
   }));
 
@@ -124,7 +123,7 @@ function createApiRouter({ repos, config }) {
     ? '/uploads/' + req.session.businessId + '/' + req.file.filename
     : '';
 
-  router.post('/products', authRequired, upload.single('image'), asyncHandler(async (req, res) => {
+  router.post('/products', authRequired, upload.single('image'), verificarImagenes, asyncHandler(async (req, res) => {
     const { name, description, price, category_id } = req.body;
 
     const id = await repos.products.forBusiness(req.session.businessId).create({
@@ -144,10 +143,10 @@ function createApiRouter({ repos, config }) {
     res.json({ ok: true });
   }));
 
-  router.put('/products/:id', authRequired, requireIntParam('id'), upload.single('image'), asyncHandler(async (req, res) => {
+  router.put('/products/:id', authRequired, requireIntParam('id'), upload.single('image'), verificarImagenes, asyncHandler(async (req, res) => {
     const { name, description, price, category_id, is_active } = req.body;
 
-    await repos.products.forBusiness(req.session.businessId).update(req.params.id, {
+    const afectó = await repos.products.forBusiness(req.session.businessId).update(req.params.id, {
       name,
       description,
       price: parseFloat(price),
@@ -156,11 +155,13 @@ function createApiRouter({ repos, config }) {
       image: uploadedPath(req)
     });
 
+    requireAffected(afectó, 'Producto no encontrado');
     res.json({ ok: true });
   }));
 
   router.delete('/products/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
-    await repos.products.forBusiness(req.session.businessId).remove(req.params.id);
+    const afectó = await repos.products.forBusiness(req.session.businessId).remove(req.params.id);
+    requireAffected(afectó, 'Producto no encontrado');
     res.json({ ok: true });
   }));
 
@@ -172,6 +173,11 @@ function createApiRouter({ repos, config }) {
     const qr = await QRCode.toDataURL(menuUrl, { width: size, margin: 2, color: { dark: '#1A1A18', light: '#FFFFFF' } });
     res.json({ qr });
   }));
+
+  // Va al final: traduce los errores de multer (que llegan sin statusCode y en
+  // inglés) a errores de dominio, antes de que el handler central los tome por
+  // bugs y responda 500.
+  router.use(traducirErroresDeSubida);
 
   return router;
 }

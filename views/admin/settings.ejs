@@ -138,8 +138,10 @@ document.getElementById('settingsForm').addEventListener('submit', async functio
   });
   fd.append('hours', JSON.stringify(hoursData));
 
-  var res = await fetch('/api/settings', { method: 'POST', body: fd });
-  if (res.ok) {
+  // Acá no se recarga: la página ya refleja lo que el usuario escribió, y
+  // recargar le haría perder el scroll en un formulario largo. Sólo se
+  // confirma; si falla, apiFetch deja el error arriba.
+  if (await apiFetch('/api/settings', { method: 'POST', body: fd })) {
     document.getElementById('saveAlert').style.display = '';
     setTimeout(function() { document.getElementById('saveAlert').style.display = 'none'; }, 3000);
   }

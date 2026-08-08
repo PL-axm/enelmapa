@@ -2,7 +2,9 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const superRequired = require('../middleware/superauth');
 const asyncHandler = require('../middleware/asyncHandler');
+const { createLoginLimiter } = require('../middleware/rateLimit');
 const { verifySuperadmin } = require('../services/superadminAuth');
+const { NotFoundError } = require('../errors');
 
 // Este router es el único que usa `repos.businesses.platform`, la superficie
 // que cruza negocios a propósito: el superadmin puede crear, editar y borrar
@@ -15,11 +17,19 @@ const { verifySuperadmin } = require('../services/superadminAuth');
 function createSuperadminRouter({ repos, config }) {
   const router = express.Router();
 
+  // Más estricto que el de /admin: es una sola cuenta conocida, nadie legítimo
+  // necesita muchos reintentos, y es la que más daño hace si cae.
+  const loginLimiter = createLoginLimiter({
+    windowMs: config.rateLimit.windowMs,
+    max: config.rateLimit.superadminMax,
+    mensaje: 'Demasiados intentos. Esperá unos minutos.'
+  });
+
   router.get('/login', (req, res) => {
     res.render('superadmin/login', { error: null });
   });
 
-  router.post('/login', (req, res) => {
+  router.post('/login', loginLimiter, (req, res) => {
     const { email, password } = req.body;
     if (verifySuperadmin({ email, password }, config.superadmin)) {
       req.session.isSuper = true;
@@ -88,9 +98,14 @@ function createSuperadminRouter({ repos, config }) {
 
   router.post('/reset-password/:userId', superRequired, asyncHandler(async (req, res) => {
     const { new_password } = req.body;
-    await repos.users.platform.setPassword(req.params.userId, bcrypt.hashSync(new_password, 10));
 
+    // Se busca ANTES de escribir: con un userId inexistente esto respondía 500
+    // por un TypeError al leer `business_id` de undefined (mismo síntoma que
+    // B4 — no distinguía "no encontrado" de "listo").
     const user = await repos.users.platform.findById(req.params.userId);
+    if (!user) throw new NotFoundError('Usuario no encontrado');
+
+    await repos.users.platform.setPassword(user.id, bcrypt.hashSync(new_password, 10));
     res.redirect('/superadmin/edit/' + user.business_id);
   }));
 
