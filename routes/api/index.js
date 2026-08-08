@@ -5,7 +5,7 @@ const fs = require('fs');
 const QRCode = require('qrcode');
 const authRequired = require('../../middleware/auth');
 const asyncHandler = require('../../middleware/asyncHandler');
-const { ValidationError } = require('../../errors');
+const { ValidationError, NotFoundError } = require('../../errors');
 
 // Un :id no numérico llega tal cual al SQL (`WHERE id = 'abc'`) y MySQL
 // responde ER_TRUNCATED_WRONG_VALUE. Se corta acá, en el borde, para que ni
@@ -19,6 +19,19 @@ function requireIntParam(name) {
     req.params[name] = value;
     next();
   };
+}
+
+// Los repos devuelven si la escritura afectó alguna fila. Hasta acá eso se
+// ignoraba y todo respondía {ok:true}, así que "no existe", "no es tuyo" y
+// "listo" se veían igual desde el panel (hallazgo B4).
+//
+// Se responde 404 en los dos casos de fallo, y es a propósito: distinguir "no
+// existe" de "no es tuyo" con un 403 confirmaría que ese id existe en OTRO
+// negocio. Un enumerador podría mapear qué ids están ocupados recorriendo la
+// ruta. Como el repo ya scopea por business_id, "no lo encontré dentro de tu
+// negocio" es además la descripción honesta de lo que pasó.
+function requireAffected(afectó, mensaje) {
+  if (!afectó) throw new NotFoundError(mensaje);
 }
 
 function requireOrderArray(order) {
@@ -103,17 +116,16 @@ function createApiRouter({ repos, config }) {
     res.json({ ok: true });
   }));
 
-  // `rename`/`remove` devuelven si afectaron alguna fila, pero acá todavía se
-  // ignora: distinguir "no existe" de "no es tuyo" de "listo" es B4, que
-  // cambia el contrato de /api y va en su propia rama.
   router.put('/categories/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
     const { name } = req.body;
-    await repos.categories.forBusiness(req.session.businessId).rename(req.params.id, name);
+    const afectó = await repos.categories.forBusiness(req.session.businessId).rename(req.params.id, name);
+    requireAffected(afectó, 'Categoría no encontrada');
     res.json({ ok: true });
   }));
 
   router.delete('/categories/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
-    await repos.categories.forBusiness(req.session.businessId).remove(req.params.id);
+    const afectó = await repos.categories.forBusiness(req.session.businessId).remove(req.params.id);
+    requireAffected(afectó, 'Categoría no encontrada');
     res.json({ ok: true });
   }));
 
@@ -147,7 +159,7 @@ function createApiRouter({ repos, config }) {
   router.put('/products/:id', authRequired, requireIntParam('id'), upload.single('image'), asyncHandler(async (req, res) => {
     const { name, description, price, category_id, is_active } = req.body;
 
-    await repos.products.forBusiness(req.session.businessId).update(req.params.id, {
+    const afectó = await repos.products.forBusiness(req.session.businessId).update(req.params.id, {
       name,
       description,
       price: parseFloat(price),
@@ -156,11 +168,13 @@ function createApiRouter({ repos, config }) {
       image: uploadedPath(req)
     });
 
+    requireAffected(afectó, 'Producto no encontrado');
     res.json({ ok: true });
   }));
 
   router.delete('/products/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
-    await repos.products.forBusiness(req.session.businessId).remove(req.params.id);
+    const afectó = await repos.products.forBusiness(req.session.businessId).remove(req.params.id);
+    requireAffected(afectó, 'Producto no encontrado');
     res.json({ ok: true });
   }));
 

@@ -105,7 +105,7 @@ function saveOrder() {
   var rows = document.querySelectorAll('.drag-row');
   var order = [];
   rows.forEach(function(r) { order.push(parseInt(r.dataset.id)); });
-  fetch('/api/categories/reorder', {
+  apiFetch('/api/categories/reorder', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ order: order })
@@ -115,8 +115,7 @@ function saveOrder() {
 async function addCat() {
   var name = document.getElementById('newCatName').value.trim();
   if (!name) return;
-  await fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name}) });
-  location.reload();
+  await apiFetchThenReload('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name}) });
 }
 function editCat(id, name) {
   document.getElementById('editCatId').value = id;
@@ -127,13 +126,11 @@ async function saveCat() {
   var id = document.getElementById('editCatId').value;
   var name = document.getElementById('editCatName').value.trim();
   if (!name) return;
-  await fetch('/api/categories/' + id, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name}) });
-  location.reload();
+  await apiFetchThenReload('/api/categories/' + id, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name}) });
 }
 async function deleteCat(id, name) {
   if (!confirm('Eliminar "' + name + '" y todos sus productos?')) return;
-  await fetch('/api/categories/' + id, { method: 'DELETE' });
-  location.reload();
+  await apiFetchThenReload('/api/categories/' + id, { method: 'DELETE' });
 }
 </script>
 

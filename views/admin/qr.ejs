@@ -48,14 +48,20 @@ var slug = '<%= business.slug %>';
 
 document.getElementById('downloadBtn').href = document.getElementById('qrImage').src;
 
-function regenerateQR() {
+async function regenerateQR() {
   var size = document.getElementById('qrSize').value;
-  fetch('/api/qr?size=' + size)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      document.getElementById('qrImage').src = data.qr;
-      document.getElementById('downloadBtn').href = data.qr;
-    });
+  var res = await fetch('/api/qr?size=' + size);
+
+  // Sin esto, un fallo dejaba el QR viejo en pantalla sin ningún aviso: el
+  // usuario podía imprimir un código creyendo que era el nuevo.
+  if (!res.ok) {
+    await apiFetch('/api/qr?size=' + size);
+    return;
+  }
+
+  var data = await res.json();
+  document.getElementById('qrImage').src = data.qr;
+  document.getElementById('downloadBtn').href = data.qr;
 }
 </script>
 
