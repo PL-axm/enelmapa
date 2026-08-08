@@ -34,7 +34,16 @@ function warnAboutSecureCookie() {
 }
 
 initDb(container.pool).then(() => {
-  const app = createApp({ pool: container.pool, config: container.config });
+  // Se le pasa el container tal cual y `createApp` destructura lo que usa. La
+  // primera versión enumeraba las dependencias acá una por una, y agregar
+  // `repos` en la Fase 4 significó olvidarse de sumarlas en este call site: la
+  // suite quedó verde (los tests arman su propia app) y la app real se cayó
+  // entera. Un solo objeto, un solo lugar donde puede faltar algo.
+  //
+  // Esto no contradice la regla de no pasar el container hacia abajo: createApp
+  // es parte del composition root y declara sus dependencias en la firma. Lo
+  // que nunca recibe el container es un router o un middleware.
+  const app = createApp(container);
 
   app.listen(config.port, () => {
     console.log('EnElMapa corriendo en puerto ' + config.port);

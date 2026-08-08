@@ -4,6 +4,7 @@ const fs = require('fs');
 const { initDb } = require('./schema');
 const { createPool } = require('./pool');
 const { loadConfig } = require('../config');
+const { buildRepos } = require('../container');
 
 const menuData = [
   {
@@ -186,6 +187,7 @@ async function seed() {
   console.log('Seed sobre la base "' + config.db.database + '" en ' + config.db.host);
 
   const db = createPool(config.db);
+  const repos = buildRepos(db);
   await initDb(db);
 
   await db.query('DELETE FROM products');
@@ -194,29 +196,47 @@ async function seed() {
   await db.query('DELETE FROM users');
   await db.query('DELETE FROM businesses');
 
-  const [bizResult] = await db.query(
-    'INSERT INTO businesses (slug, name, address, phone, whatsapp, instagram, facebook, banner_img, logo_img, is_open) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    ['caficultor', 'CAFICULTOR', 'Calle 7 # 14-19 mall del parque local 1 Circasia, Quindío, Colombia', '+57 300 219 2895', '573002192895', 'anniecroissantycafe', 'anniecroissantycafe', '/uploads/1/banner.jpg', '/uploads/1/logo.jpg', 0]
-  );
-  const bizId = bizResult.insertId;
+  // El alta de negocio + admin + horarios pasa por los mismos repositories que
+  // usa el superadmin. Antes esto era una tercera copia del mismo INSERT, con
+  // su propio array de días (hallazgo E3): cambiar uno y olvidar el otro era
+  // cuestión de tiempo.
+  const bizId = await repos.businesses.platform.create({
+    slug: 'caficultor',
+    name: 'CAFICULTOR',
+    address: 'Calle 7 # 14-19 mall del parque local 1 Circasia, Quindío, Colombia',
+    phone: '+57 300 219 2895',
+    whatsapp: '573002192895',
+    instagram: 'anniecroissantycafe',
+    facebook: 'anniecroissantycafe'
+  });
+  await repos.businesses.forBusiness(bizId).update({
+    banner_img: '/uploads/1/banner.jpg',
+    logo_img: '/uploads/1/logo.jpg',
+    is_open: 0
+  });
 
-  const hash = bcrypt.hashSync('admin123', 10);
-  await db.query('INSERT INTO users (business_id, email, password_hash, name) VALUES (?, ?, ?, ?)', [bizId, 'admin@caficultor.com', hash, 'Administrador']);
+  await repos.users.forBusiness(bizId).create({
+    email: 'admin@caficultor.com',
+    passwordHash: bcrypt.hashSync('admin123', 10),
+    name: 'Administrador'
+  });
 
-  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  for (let i = 0; i < days.length; i++) {
-    await db.query('INSERT INTO business_hours (business_id, day_index, day_name, open_time, close_time) VALUES (?, ?, ?, ?, ?)', [bizId, i, days[i], i === 5 ? '07:00' : '07:30', '20:00']);
-  }
+  await repos.businesses.platform.createDefaultHours(bizId, { open: '07:30', close: '20:00' });
 
-  for (let ci = 0; ci < menuData.length; ci++) {
-    const cat = menuData[ci];
-    const [catResult] = await db.query('INSERT INTO categories (business_id, name, sort_order) VALUES (?, ?, ?)', [bizId, cat.name, ci]);
-    const catId = catResult.insertId;
+  const cats = repos.categories.forBusiness(bizId);
+  const prods = repos.products.forBusiness(bizId);
 
-    for (let pi = 0; pi < cat.products.length; pi++) {
-      const p = cat.products[pi];
-      const imgPath = p.img ? '/uploads/1/' + p.img : '';
-      await db.query('INSERT INTO products (business_id, category_id, name, description, price, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)', [bizId, catId, p.name, p.desc || '', p.price, imgPath, pi]);
+  for (const cat of menuData) {
+    const catId = await cats.create({ name: cat.name });
+
+    for (const p of cat.products) {
+      await prods.create({
+        name: p.name,
+        description: p.desc,
+        price: p.price,
+        categoryId: catId,
+        image: p.img ? '/uploads/1/' + p.img : ''
+      });
     }
   }
 

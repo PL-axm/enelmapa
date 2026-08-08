@@ -27,9 +27,17 @@ npm test
 
 - `tests/unit/` — funciones puras, sin HTTP ni DB real. Ejemplo:
   `tests/unit/subdomain.test.js` contra `services/subdomain.js`.
-- `tests/integration/` — Supertest contra `app.js` real, con MySQL real
-  (`enelmapa_test`). Cubren rutas completas: auth, scoping por
-  `business_id`, etc.
+- `tests/integration/` — Supertest contra la app real (armada con
+  `createTestApp()`), con MySQL real (`enelmapa_test`). Cubren rutas
+  completas: auth, scoping por `business_id`, etc.
+- `tests/repositories/` — el repo directo contra MySQL real, sin HTTP ni
+  sesión. Prueban que el aislamiento por `business_id` se sostiene aunque a
+  un repo lo llame un servicio o un script en vez de una ruta, y que no hay
+  forma de saltearse `forBusiness`. Cada repo nuevo de la Fase 4 trae el suyo.
+- `tests/helpers/container.js` — `createTestApp()`, `getTestPool()`,
+  `getTestRepos()`, `getTestContainer()`. Desde la Fase 3 la app se construye
+  con dependencias inyectadas, así que un test la arma acá en vez de
+  `require('../../app')`.
 - `tests/helpers/db.js` — `resetDb()` (limpia todo antes de cada test,
   `initDb()` + `DELETE FROM businesses`, cascada por FK) y `closeDb()`
   (cierra el pool al final, si no Jest queda colgado esperando que se
@@ -50,10 +58,15 @@ npm test
   comparten la misma DB `enelmapa_test`, así que dos archivos corriendo en
   paralelo se pisarían el estado. Si algún día se necesita paralelismo real,
   hay que migrar a una DB (o schema) por worker primero.
-- Las rutas de `/api/*` con `authRequired` responden `302` a `/admin/login`
-  cuando no hay sesión, no `401` (comportamiento actual documentado en
-  `BEST_PRACTICES.md` — inconsistente para una API JSON, pero es lo que hay
-  hoy; los tests verifican el comportamiento real, no el ideal).
+- Las rutas de `/api/*` sin sesión responden `401` JSON; las de `/admin`,
+  `302` al login. Eso cambió en la Fase 2 (antes `/api` también redirigía, y
+  el `fetch()` del panel recibía el HTML del login como si fuera la respuesta
+  a su petición). Ver `middleware/auth.js`.
+- Las mutaciones de `/api` todavía responden `{ok:true}` aunque no hayan
+  afectado ninguna fila, así que "no existe", "no es tuyo" y "listo" se ven
+  igual. Es el hallazgo B4, pendiente. Los repos ya devuelven si afectaron
+  algo; los handlers todavía lo ignoran. Los tests verifican el estado real en
+  DB, no el código HTTP — por eso siguen sirviendo para probar aislamiento.
 - El middleware de subdominio en `app.js` trata cualquier Host con 3+
   partes separadas por punto (cuya primera parte no sea `www`/`admin`) como
   un slug de negocio — incluye IPs tipo `127.0.0.1`. Si un test le pega a

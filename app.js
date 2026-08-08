@@ -13,9 +13,14 @@ const { getSubdomain } = require('./services/subdomain');
 
 // Antes este archivo creaba la app al importarse y cada router se traía el
 // pool y la config por su cuenta con un `require` a nivel de módulo. Ahora
-// recibe las dos dependencias y las reparte: cada pieza declara en su firma lo
+// recibe las dependencias y las reparte: cada pieza declara en su firma lo
 // que necesita, y nadie recibe el container entero (ver container.js).
-function createApp({ pool, config }) {
+//
+// Ningún router recibe ya el pool: al cerrar la Fase 4 no queda SQL fuera de
+// repositories/, así que la app se arma sólo con repos y config. Que `pool` no
+// aparezca en ninguna firma de router es la señal de que la migración está
+// completa.
+function createApp({ repos, config }) {
   const app = express();
 
   app.set('view engine', 'ejs');
@@ -29,7 +34,7 @@ function createApp({ pool, config }) {
 
   app.use(session(config.session));
 
-  const tenantMiddleware = createTenantMiddleware({ pool });
+  const tenantMiddleware = createTenantMiddleware({ repos });
   const publicRoutes = createPublicRouter();
 
   app.use((req, res, next) => {
@@ -46,14 +51,14 @@ function createApp({ pool, config }) {
     next();
   });
 
-  app.use('/admin', createAdminRouter({ pool, config }));
-  app.use('/superadmin', createSuperadminRouter({ pool, config }));
-  app.use('/api', createApiRouter({ pool, config }));
+  app.use('/admin', createAdminRouter({ repos, config }));
+  app.use('/superadmin', createSuperadminRouter({ repos, config }));
+  app.use('/api', createApiRouter({ repos, config }));
 
   app.get('/s/:slug', tenantMiddleware, publicRoutes);
 
   app.get('/', asyncHandler(async (req, res) => {
-    const [businesses] = await pool.query('SELECT slug, name, logo_img FROM businesses ORDER BY name');
+    const businesses = await repos.businesses.platform.listForHome();
     res.render('home', { businesses });
   }));
 
