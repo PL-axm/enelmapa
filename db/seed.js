@@ -1,10 +1,9 @@
-const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 const { initDb } = require('./schema');
 const { createPool } = require('./pool');
 const { loadConfig } = require('../config');
-const { buildRepos } = require('../container');
+const { createContainer } = require('../container');
 
 const menuData = [
   {
@@ -186,8 +185,8 @@ async function seed() {
   const config = loadConfig();
   console.log('Seed sobre la base "' + config.db.database + '" en ' + config.db.host);
 
-  const db = createPool(config.db);
-  const repos = buildRepos(db);
+  const container = createContainer(config);
+  const { pool: db, repos, services } = container;
   await initDb(db);
 
   await db.query('DELETE FROM products');
@@ -200,28 +199,27 @@ async function seed() {
   // usa el superadmin. Antes esto era una tercera copia del mismo INSERT, con
   // su propio array de días (hallazgo E3): cambiar uno y olvidar el otro era
   // cuestión de tiempo.
-  const bizId = await repos.businesses.platform.create({
-    slug: 'caficultor',
-    name: 'CAFICULTOR',
-    address: 'Calle 7 # 14-19 mall del parque local 1 Circasia, Quindío, Colombia',
-    phone: '+57 300 219 2895',
-    whatsapp: '573002192895',
-    instagram: 'anniecroissantycafe',
-    facebook: 'anniecroissantycafe'
+  // El alta pasa por el mismo servicio que usa el superadmin, así que el seed
+  // ya no puede divergir de él: negocio + admin + horarios en una transacción.
+  const bizId = await services.businesses.createWithDefaults({
+    business: {
+      slug: 'caficultor',
+      name: 'CAFICULTOR',
+      address: 'Calle 7 # 14-19 mall del parque local 1 Circasia, Quindío, Colombia',
+      phone: '+57 300 219 2895',
+      whatsapp: '573002192895',
+      instagram: 'anniecroissantycafe',
+      facebook: 'anniecroissantycafe'
+    },
+    admin: { email: 'admin@caficultor.com', password: 'admin123', name: 'Administrador' }
   });
+
+  // Lo que createWithDefaults no cubre porque es específico del demo.
   await repos.businesses.forBusiness(bizId).update({
     banner_img: '/uploads/1/banner.jpg',
     logo_img: '/uploads/1/logo.jpg',
     is_open: 0
   });
-
-  await repos.users.forBusiness(bizId).create({
-    email: 'admin@caficultor.com',
-    passwordHash: bcrypt.hashSync('admin123', 10),
-    name: 'Administrador'
-  });
-
-  await repos.businesses.platform.createDefaultHours(bizId, { open: '07:30', close: '20:00' });
 
   const cats = repos.categories.forBusiness(bizId);
   const prods = repos.products.forBusiness(bizId);

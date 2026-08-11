@@ -1,5 +1,4 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
 const superRequired = require('../middleware/superauth');
 const asyncHandler = require('../middleware/asyncHandler');
 const { createLoginLimiter } = require('../middleware/rateLimit');
@@ -11,10 +10,10 @@ const { NotFoundError } = require('../errors');
 // cualquiera. Que esas llamadas se lean distinto de las scopeadas es
 // deliberado — ver el comentario de businessRepository.
 //
-// En la Fase 5, el alta de negocio+admin+horarios pasa a
-// `businessService.createWithDefaults()` envuelto en `withTransaction`, que es
-// lo que hoy deja negocios huérfanos si el email del admin ya existe.
-function createSuperadminRouter({ repos, config }) {
+// El alta de negocio+admin+horarios pasa por `businessService`, que la envuelve
+// en una transacción: antes, si el email del admin ya existía, quedaba un
+// negocio sin admin ni horarios y con el slug ocupado.
+function createSuperadminRouter({ repos, services, config }) {
   const router = express.Router();
 
   // Más estricto que el de /admin: es una sola cuenta conocida, nadie legítimo
@@ -55,25 +54,20 @@ function createSuperadminRouter({ repos, config }) {
   router.post('/create', superRequired, asyncHandler(async (req, res) => {
     const { slug, name, address, phone, whatsapp, instagram, facebook, tiktok, admin_email, admin_password, admin_name } = req.body;
 
-    if (await repos.businesses.platform.slugExists(slug)) {
-      return res.render('superadmin/create', { error: 'El slug "' + slug + '" ya existe' });
+    try {
+      await services.businesses.createWithDefaults({
+        business: { slug, name, address, phone, whatsapp, instagram, facebook, tiktok },
+        admin: { email: admin_email, password: admin_password, name: admin_name }
+      });
+    } catch (err) {
+      // Los errores de formulario se muestran SOBRE el formulario, no en la
+      // página de error genérica: si no, el operador pierde todo lo que
+      // escribió. Cualquier otra cosa sí va al handler central.
+      if (err.statusCode === 400) {
+        return res.render('superadmin/create', { error: err.message });
+      }
+      throw err;
     }
-
-    // OJO: estas tres escrituras todavía NO son atómicas. Si el email del
-    // admin ya existe, el negocio queda creado sin admin ni horarios y con el
-    // slug ocupado. La costura para arreglarlo (`withTransaction`) ya está en
-    // container.js; se usa en la Fase 5, cuando exista businessService.
-    const bizId = await repos.businesses.platform.create({
-      slug, name, address, phone, whatsapp, instagram, facebook, tiktok
-    });
-
-    await repos.users.forBusiness(bizId).create({
-      email: admin_email,
-      passwordHash: bcrypt.hashSync(admin_password, 10),
-      name: admin_name
-    });
-
-    await repos.businesses.platform.createDefaultHours(bizId);
 
     res.redirect('/superadmin');
   }));
@@ -105,7 +99,7 @@ function createSuperadminRouter({ repos, config }) {
     const user = await repos.users.platform.findById(req.params.userId);
     if (!user) throw new NotFoundError('Usuario no encontrado');
 
-    await repos.users.platform.setPassword(user.id, bcrypt.hashSync(new_password, 10));
+    await repos.users.platform.setPassword(user.id, services.auth.hashPassword(new_password));
     res.redirect('/superadmin/edit/' + user.business_id);
   }));
 

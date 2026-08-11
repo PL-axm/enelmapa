@@ -1,5 +1,4 @@
 const express = require('express');
-const QRCode = require('qrcode');
 const { createUploader, verificarImagenes, traducirErroresDeSubida } = require('../../services/imageUpload');
 const authRequired = require('../../middleware/auth');
 const asyncHandler = require('../../middleware/asyncHandler');
@@ -42,7 +41,7 @@ function requireOrderArray(order) {
 // Sin `pool`: no queda una sola query inline acá. Los handlers son cableado
 // puro — leer la request, llamar al repo, responder. El scope de tenant entra
 // una vez por handler, en `forBusiness(req.session.businessId)`.
-function createApiRouter({ repos, config }) {
+function createApiRouter({ repos, services }) {
   const router = express.Router();
 
   const upload = createUploader();
@@ -168,10 +167,10 @@ function createApiRouter({ repos, config }) {
   // === QR CODE ===
   router.get('/qr', authRequired, asyncHandler(async (req, res) => {
     const business = await repos.businesses.forBusiness(req.session.businessId).get();
-    const size = parseInt(req.query.size) || 300;
-    const menuUrl = 'https://' + config.domain + '/s/' + business.slug;
-    const qr = await QRCode.toDataURL(menuUrl, { width: size, margin: 2, color: { dark: '#1A1A18', light: '#FFFFFF' } });
-    res.json({ qr });
+    const { dataUrl } = await services.qr.forSlug(business.slug, {
+      size: parseInt(req.query.size) || undefined
+    });
+    res.json({ qr: dataUrl });
   }));
 
   // Va al final: traduce los errores de multer (que llegan sin statusCode y en

@@ -12,14 +12,14 @@ const { createBusiness } = require('../helpers/fixtures');
 // Acá se arma una app aparte, con la misma DB pero un límite chico, para
 // probar el limitador de verdad en vez de darlo por bueno.
 function appConLimite({ loginMax = 3, superMax = 2 } = {}) {
-  const { pool, repos, sessionStore } = getTestContainer();
+  const { repos, services, sessionStore } = getTestContainer();
   const config = loadConfig({
     ...process.env,
     RATE_LIMIT_LOGIN_MAX: String(loginMax),
     RATE_LIMIT_SUPER_MAX: String(superMax),
     RATE_LIMIT_WINDOW_MIN: '15'
   });
-  return createApp({ repos, config, sessionStore });
+  return createApp({ repos, services, config, sessionStore });
 }
 
 describe('rate limiting de los logins (S5)', () => {
