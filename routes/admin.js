@@ -2,6 +2,7 @@ const express = require('express');
 const authRequired = require('../middleware/auth');
 const asyncHandler = require('../middleware/asyncHandler');
 const { createLoginLimiter } = require('../middleware/rateLimit');
+const { regenerarSesion, destruirSesion } = require('../middleware/sesion');
 
 // Cada handler es leer la sesión, llamar a un repo o servicio, y renderizar.
 // Ni SQL ni bcrypt ni generación de QR: eso vive en repositories/ y services/.
@@ -26,6 +27,11 @@ function createAdminRouter({ repos, services, config }) {
       return res.render('admin/login', { error: 'Credenciales incorrectas' });
     }
 
+    // Sesión nueva ANTES de escribir los datos del usuario: si el visitante
+    // llegó con una cookie plantada, ese id se descarta acá y el que queda
+    // autenticado es uno que el atacante no conoce.
+    await regenerarSesion(req);
+
     req.session.userId = user.id;
     req.session.businessId = user.business_id;
     req.session.userName = user.name;
@@ -35,10 +41,13 @@ function createAdminRouter({ repos, services, config }) {
     res.redirect('/admin/dashboard');
   }));
 
-  router.get('/logout', (req, res) => {
-    req.session.destroy();
+  // POST y no GET: con GET, un tercero podía desloguear a cualquiera con un
+  // `<img src="/admin/logout">` en cualquier página. Es molestia y no brecha,
+  // pero el arreglo es una línea y el formulario ya lleva el token CSRF.
+  router.post('/logout', asyncHandler(async (req, res) => {
+    await destruirSesion(req);
     res.redirect('/admin/login');
-  });
+  }));
 
   router.get('/dashboard', authRequired, asyncHandler(async (req, res) => {
     const scope = req.session.businessId;

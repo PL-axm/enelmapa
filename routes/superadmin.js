@@ -2,6 +2,7 @@ const express = require('express');
 const superRequired = require('../middleware/superauth');
 const asyncHandler = require('../middleware/asyncHandler');
 const { createLoginLimiter } = require('../middleware/rateLimit');
+const { regenerarSesion, destruirSesion } = require('../middleware/sesion');
 const { verifySuperadmin } = require('../services/superadminAuth');
 const { NotFoundError } = require('../errors');
 const validate = require('../middleware/validate');
@@ -44,19 +45,23 @@ function createSuperadminRouter({ repos, services, config }) {
     res.render('superadmin/login', { error: null });
   });
 
-  router.post('/login', loginLimiter, (req, res) => {
+  router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
     const { email, password } = req.body;
-    if (verifySuperadmin({ email, password }, config.superadmin)) {
-      req.session.isSuper = true;
-      return res.redirect('/superadmin');
-    }
-    res.render('superadmin/login', { error: 'Credenciales incorrectas' });
-  });
 
-  router.get('/logout', (req, res) => {
-    req.session.destroy();
+    if (!verifySuperadmin({ email, password }, config.superadmin)) {
+      return res.render('superadmin/login', { error: 'Credenciales incorrectas' });
+    }
+
+    // Igual que en /admin: sesión nueva antes de marcarla como superadmin.
+    await regenerarSesion(req);
+    req.session.isSuper = true;
+    res.redirect('/superadmin');
+  }));
+
+  router.post('/logout', asyncHandler(async (req, res) => {
+    await destruirSesion(req);
     res.redirect('/superadmin/login');
-  });
+  }));
 
   router.get('/', superRequired, asyncHandler(async (req, res) => {
     const businesses = await repos.businesses.platform.listWithCounts();
