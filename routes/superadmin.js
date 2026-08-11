@@ -4,6 +4,8 @@ const asyncHandler = require('../middleware/asyncHandler');
 const { createLoginLimiter } = require('../middleware/rateLimit');
 const { verifySuperadmin } = require('../services/superadminAuth');
 const { NotFoundError } = require('../errors');
+const validate = require('../middleware/validate');
+const { schemas } = require('../validators');
 
 // Este router es el único que usa `repos.businesses.platform`, la superficie
 // que cruza negocios a propósito: el superadmin puede crear, editar y borrar
@@ -13,6 +15,20 @@ const { NotFoundError } = require('../errors');
 // El alta de negocio+admin+horarios pasa por `businessService`, que la envuelve
 // en una transacción: antes, si el email del admin ya existía, quedaba un
 // negocio sin admin ni horarios y con el slug ocupado.
+// Los errores de validación del alta se muestran SOBRE el formulario, igual que
+// los del servicio: si fueran a la página de error genérica, el operador
+// perdería todo lo que escribió. Por eso este wrapper en vez de `validate`
+// pelado, que delega en el handler central.
+function validarFormulario(schema, vista) {
+  const validar = validate(schema);
+  return (req, res, next) => validar(req, res, (err) => {
+    if (err && err.statusCode === 400) {
+      return res.render(vista, { error: err.message });
+    }
+    next(err);
+  });
+}
+
 function createSuperadminRouter({ repos, services, config }) {
   const router = express.Router();
 
@@ -51,7 +67,10 @@ function createSuperadminRouter({ repos, services, config }) {
     res.render('superadmin/create', { error: null });
   });
 
-  router.post('/create', superRequired, asyncHandler(async (req, res) => {
+  // La validación corre antes del servicio, así que el slug llega con formato
+  // garantizado. Un slug inválido ya no depende de que MySQL se queje: se
+  // rechaza en el borde con un mensaje que dice qué está mal (hallazgo S7).
+  router.post('/create', superRequired, validarFormulario(schemas.businessCreate, 'superadmin/create'), asyncHandler(async (req, res) => {
     const { slug, name, address, phone, whatsapp, instagram, facebook, tiktok, admin_email, admin_password, admin_name } = req.body;
 
     try {
@@ -79,7 +98,7 @@ function createSuperadminRouter({ repos, services, config }) {
     res.render('superadmin/edit', { business, users });
   }));
 
-  router.post('/edit/:id', superRequired, asyncHandler(async (req, res) => {
+  router.post('/edit/:id', superRequired, validate(schemas.businessEdit), asyncHandler(async (req, res) => {
     const { slug, name, address, phone, whatsapp, instagram, facebook, tiktok, is_open } = req.body;
     await repos.businesses.platform.update(req.params.id, {
       slug, name,
@@ -90,7 +109,7 @@ function createSuperadminRouter({ repos, services, config }) {
     res.redirect('/superadmin');
   }));
 
-  router.post('/reset-password/:userId', superRequired, asyncHandler(async (req, res) => {
+  router.post('/reset-password/:userId', superRequired, validate(schemas.resetPassword), asyncHandler(async (req, res) => {
     const { new_password } = req.body;
 
     // Se busca ANTES de escribir: con un userId inexistente esto respondía 500
