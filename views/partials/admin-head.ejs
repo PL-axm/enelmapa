@@ -61,6 +61,9 @@
   .img-preview { width: 120px; height: 80px; border-radius: 8px; object-fit: cover; background: #F2EFEA; margin-top: 8px; }
   .alert { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
   .alert-success { background: #D4EDDA; color: #155724; }
+  .logout-form { display: inline; }
+  .logout-btn { background: none; border: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: none; }
+  .logout-btn:hover { text-decoration: underline; }
   .api-error { background: #FDECEA; border: 1px solid rgba(231,76,60,0.25); color: #B03A2E; padding: 12px 20px; font-size: 14px; }
   @media (max-width: 768px) {
     .sidebar { width: 100%; height: auto; position: relative; }
@@ -91,7 +94,10 @@
     <div class="topbar-title"><%= title %></div>
     <div class="topbar-user">
       <%= session.businessName %>
-      <a href="/admin/logout">Salir</a>
+      <form method="POST" action="/admin/logout" class="logout-form">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <button type="submit" class="logout-btn">Salir</button>
+      </form>
     </div>
   </div>
   <div id="apiError" class="api-error" style="display:none"></div>

@@ -2,6 +2,7 @@ const request = require('supertest');
 const { createTestApp } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createBusiness } = require('../helpers/fixtures');
+const { loginAdmin } = require('../helpers/sesion');
 
 const app = createTestApp();
 
@@ -76,19 +77,29 @@ describe('auth de /admin', () => {
     expect(res.text).toContain(business.name);
   });
 
+  // El logout pasó de GET a POST: con GET, un tercero podía desloguear a
+  // cualquiera con un `<img src="/admin/logout">`.
   test('logout destruye la sesión: request posterior a /admin/dashboard vuelve a redirigir a login', async () => {
-    const agent = request.agent(app);
-    await agent
-      .post('/admin/login')
-      .type('form')
-      .send({ email: business.adminEmail, password: business.adminPassword });
+    const agent = await loginAdmin(app, {
+      email: business.adminEmail, password: business.adminPassword
+    });
 
-    const logoutRes = await agent.get('/admin/logout');
+    const logoutRes = await agent.post('/admin/logout');
     expect(logoutRes.status).toBe(302);
     expect(logoutRes.headers.location).toBe('/admin/login');
 
     const res = await agent.get('/admin/dashboard');
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/admin/login');
+  });
+
+  test('el logout por GET ya no existe', async () => {
+    const agent = await loginAdmin(app, {
+      email: business.adminEmail, password: business.adminPassword
+    });
+
+    expect((await agent.get('/admin/logout')).status).toBe(404);
+    // y la sesión sigue viva: el GET no deslogueó a nadie
+    expect((await agent.get('/admin/dashboard')).status).toBe(200);
   });
 });

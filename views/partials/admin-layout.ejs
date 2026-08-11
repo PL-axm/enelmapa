@@ -100,7 +100,10 @@
     <div class="topbar-title"><%= title %></div>
     <div class="topbar-user">
       <%= session.businessName %>
-      <a href="/admin/logout">Salir</a>
+      <form method="POST" action="/admin/logout" style="display:inline">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <button type="submit" style="background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer">Salir</button>
+      </form>
     </div>
   </div>
   <div class="content">

@@ -14,6 +14,12 @@ async function resetDb() {
 
   const pool = getTestPool();
   await pool.query('DELETE FROM businesses');
+
+  // `sessions` no cuelga de ningún negocio, así que la cascada no la alcanza.
+  // Sin esto se acumulan las sesiones de toda la corrida, y cualquier test que
+  // quiera afirmar algo sobre el store —cuántas hay, que el logout borró la
+  // suya— ve el arrastre de los tests anteriores en vez de lo suyo.
+  await pool.query('DELETE FROM sessions');
 }
 
 async function closeDb() {

@@ -10,6 +10,19 @@ const bcrypt = require('bcryptjs');
 
 const BCRYPT_COST = 10;
 
+// Hash señuelo: se compara contra él cuando el email no existe, para que la
+// respuesta tarde lo mismo que con un email real.
+//
+// Sin esto, un email inexistente volvía sin llamar a bcrypt y por lo tanto en
+// microsegundos, mientras uno existente pagaba los ~80ms del hash. Esa
+// diferencia es medible desde afuera, y convierte el login en un oráculo de qué
+// emails están registrados — justo lo que el mensaje de error único trataba de
+// esconder.
+//
+// Se calcula una sola vez al cargar el módulo. Cuesta un hash al arrancar, no
+// uno por request.
+const HASH_SEÑUELO = bcrypt.hashSync('señuelo-que-nunca-es-una-contraseña-real', BCRYPT_COST);
+
 function authService({ repos }) {
   return {
     hashPassword(plano) {
@@ -22,12 +35,15 @@ function authService({ repos }) {
     async verifyAdmin({ email, password }) {
       const user = await repos.users.platform.findByEmailWithBusiness(email);
 
-      // Sin `user` no hay hash contra el que comparar. Se devuelve null sin
-      // llamar a bcrypt, así que un email inexistente responde más rápido que
-      // uno existente — es un canal de timing conocido de este diseño, y
-      // cerrarlo bien pide un hash señuelo. Queda anotado, no resuelto.
-      if (!user) return null;
-      if (!bcrypt.compareSync(password, user.password_hash)) return null;
+      // El `|| ''` importa: bcrypt.compareSync lanza si la contraseña es
+      // undefined, y un login sin campos no debería explotar.
+      const hashAComparar = user ? user.password_hash : HASH_SEÑUELO;
+      const coincide = bcrypt.compareSync(password || '', hashAComparar);
+
+      // El orden de esta condición no se puede invertir por un `&&` que
+      // corte antes: la comparación tiene que correr SIEMPRE, exista el
+      // usuario o no. Es todo el punto del señuelo.
+      if (!user || !coincide) return null;
 
       return user;
     }
