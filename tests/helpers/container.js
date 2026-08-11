@@ -38,4 +38,8 @@ function getTestRepos() {
   return getTestContainer().repos;
 }
 
-module.exports = { getTestContainer, getTestPool, getTestRepos, createTestApp };
+function getTestServices() {
+  return getTestContainer().services;
+}
+
+module.exports = { getTestContainer, getTestPool, getTestRepos, getTestServices, createTestApp };

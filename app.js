@@ -20,7 +20,7 @@ const { getSubdomain } = require('./services/subdomain');
 // repositories/, así que la app se arma sólo con repos y config. Que `pool` no
 // aparezca en ninguna firma de router es la señal de que la migración está
 // completa.
-function createApp({ repos, config, sessionStore }) {
+function createApp({ repos, services, config, sessionStore }) {
   const app = express();
 
   app.set('view engine', 'ejs');
@@ -41,7 +41,7 @@ function createApp({ repos, config, sessionStore }) {
   app.use(session({ ...config.session, store: sessionStore }));
 
   const tenantMiddleware = createTenantMiddleware({ repos });
-  const publicRoutes = createPublicRouter();
+  const publicRoutes = createPublicRouter({ services });
 
   app.use((req, res, next) => {
     const subdomain = getSubdomain(req.hostname);
@@ -57,9 +57,9 @@ function createApp({ repos, config, sessionStore }) {
     next();
   });
 
-  app.use('/admin', createAdminRouter({ repos, config }));
-  app.use('/superadmin', createSuperadminRouter({ repos, config }));
-  app.use('/api', createApiRouter({ repos, config }));
+  app.use('/admin', createAdminRouter({ repos, services, config }));
+  app.use('/superadmin', createSuperadminRouter({ repos, services, config }));
+  app.use('/api', createApiRouter({ repos, services }));
 
   app.get('/s/:slug', tenantMiddleware, publicRoutes);
 

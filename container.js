@@ -4,6 +4,10 @@ const categoryRepository = require('./repositories/categoryRepository');
 const productRepository = require('./repositories/productRepository');
 const businessRepository = require('./repositories/businessRepository');
 const userRepository = require('./repositories/userRepository');
+const authService = require('./services/authService');
+const businessService = require('./services/businessService');
+const qrService = require('./services/qrService');
+const menuService = require('./services/menuService');
 
 // Composition root: el ÚNICO lugar del código que construye dependencias.
 // Todo lo demás las recibe.
@@ -60,10 +64,22 @@ function createContainer(config) {
     }
   }
 
+  // Los servicios se cablean después de los repos porque dependen de ellos, y
+  // businessService además de withTransaction y de auth. Igual que con los
+  // repos: los colaboradores se inyectan, nunca se construyen adentro.
+  const auth = authService({ repos });
+  const services = {
+    auth,
+    qr: qrService({ config }),
+    menu: menuService(),
+    businesses: businessService({ repos, withTransaction, auth })
+  };
+
   return {
     config,
     pool,
     repos,
+    services,
     sessionStore,
     withTransaction,
     // El store tiene su propio timer de limpieza de sesiones vencidas: si no

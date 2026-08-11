@@ -1,15 +1,11 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const QRCode = require('qrcode');
 const authRequired = require('../middleware/auth');
 const asyncHandler = require('../middleware/asyncHandler');
 const { createLoginLimiter } = require('../middleware/rateLimit');
 
-// Sin `pool`: cada handler es leer la sesión, llamar a un repo y renderizar.
-// En la Fase 5 el QR se va a `qrService` (hoy duplicado con
-// routes/api/index.js, hallazgo E3) y la comparación de bcrypt del login a
-// `authService`.
-function createAdminRouter({ repos, config }) {
+// Cada handler es leer la sesión, llamar a un repo o servicio, y renderizar.
+// Ni SQL ni bcrypt ni generación de QR: eso vive en repositories/ y services/.
+function createAdminRouter({ repos, services, config }) {
   const router = express.Router();
 
   const loginLimiter = createLoginLimiter({
@@ -24,9 +20,9 @@ function createAdminRouter({ repos, config }) {
 
   router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
     const { email, password } = req.body;
-    const user = await repos.users.platform.findByEmailWithBusiness(email);
+    const user = await services.auth.verifyAdmin({ email, password });
 
-    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    if (!user) {
       return res.render('admin/login', { error: 'Credenciales incorrectas' });
     }
 
@@ -79,9 +75,8 @@ function createAdminRouter({ repos, config }) {
 
   router.get('/qr', authRequired, asyncHandler(async (req, res) => {
     const business = await repos.businesses.forBusiness(req.session.businessId).get();
-    const menuUrl = 'https://' + config.domain + '/s/' + business.slug;
-    const qrDataUrl = await QRCode.toDataURL(menuUrl, { width: 300, margin: 2, color: { dark: '#1A1A18', light: '#FFFFFF' } });
-    res.render('admin/qr', { session: req.session, business, menuUrl, qrDataUrl });
+    const { url, dataUrl } = await services.qr.forSlug(business.slug);
+    res.render('admin/qr', { session: req.session, business, menuUrl: url, qrDataUrl: dataUrl });
   }));
 
   return router;
