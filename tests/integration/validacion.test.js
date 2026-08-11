@@ -4,6 +4,7 @@ const request = require('supertest');
 const { createTestApp, getTestPool } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createBusiness } = require('../helpers/fixtures');
+const { loginAdmin } = require('../helpers/sesion');
 
 const app = createTestApp();
 
@@ -27,9 +28,7 @@ describe('validación en el borde', () => {
       adminEmail: 'val@test.local', adminPassword: 'password-val-123'
     });
 
-    agent = request.agent(app);
-    await agent.post('/admin/login').type('form')
-      .send({ email: business.adminEmail, password: business.adminPassword });
+    agent = await loginAdmin(app, { email: business.adminEmail, password: business.adminPassword });
   });
 
   async function contarProductos() {
@@ -171,9 +170,7 @@ describe('forma del mensaje de error', () => {
       slug: 'test-msg', name: 'Test Mensajes',
       adminEmail: 'msg@test.local', adminPassword: 'password-msg-123'
     });
-    agent = request.agent(app);
-    await agent.post('/admin/login').type('form')
-      .send({ email: business.adminEmail, password: business.adminPassword });
+    agent = await loginAdmin(app, { email: business.adminEmail, password: business.adminPassword });
   });
 
   test('un campo simple da un mensaje limpio, sin el nombre técnico', async () => {

@@ -28,9 +28,9 @@ const container = createContainer(config);
 // arrancar para que el síntoma no sea un misterio.
 function warnAboutSecureCookie() {
   if (!config.session.cookie.secure) return;
-  console.log('Cookie de sesión: secure=true (solo viaja por HTTPS).');
-  console.log('  Si nadie puede iniciar sesión, confirmá que Apache reenvía X-Forwarded-Proto: https.');
-  console.log('  Destrabe temporal: COOKIE_SECURE=false');
+  container.logger.info('Cookie de sesión con secure=true (sólo viaja por HTTPS). ' +
+    'Si nadie puede iniciar sesión, confirmá que Apache reenvía X-Forwarded-Proto: https. ' +
+    'Destrabe temporal: COOKIE_SECURE=false');
 }
 
 initDb(container.pool).then(() => {
@@ -46,11 +46,12 @@ initDb(container.pool).then(() => {
   const app = createApp(container);
 
   app.listen(config.port, () => {
-    console.log('EnElMapa corriendo en puerto ' + config.port);
-    console.log('Dominio: ' + config.domain);
+    container.logger.info('EnElMapa escuchando', {
+      port: config.port, domain: config.domain, env: config.nodeEnv
+    });
     warnAboutSecureCookie();
   });
 }).catch(err => {
-  console.error('Error iniciando DB:', err);
+  container.logger.excepcion('No se pudo inicializar la base de datos', err);
   process.exit(1);
 });

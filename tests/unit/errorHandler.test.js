@@ -1,10 +1,16 @@
 const { createErrorHandler, wantsJson } = require('../../middleware/errorHandler');
 const { ForbiddenError, NotFoundError } = require('../../errors');
+const { createLogger } = require('../../services/logger');
 
-// La config entra inyectada (Fase 3): antes el handler importaba el singleton,
-// así que la rama de producción no se podía ejercitar desde un unit test.
-const errorHandler = createErrorHandler({ config: { isProduction: false } });
-const errorHandlerEnProduccion = createErrorHandler({ config: { isProduction: true } });
+// La config y el logger entran inyectados: antes el handler importaba el
+// singleton de config y escribía con `console.error` suelto, así que ni la rama
+// de producción ni el formato del log se podían ejercitar desde un unit test.
+//
+// El logger va explícitamente NO silencioso: la suite corre con LOG_SILENT, y
+// acá justamente se quiere ver que escribe.
+const logger = createLogger({ level: 'debug', silent: false });
+const errorHandler = createErrorHandler({ config: { isProduction: false }, logger });
+const errorHandlerEnProduccion = createErrorHandler({ config: { isProduction: true }, logger });
 
 function fakeReq({ url = '/admin/products', accept = 'text/html', xhr = false } = {}) {
   return { method: 'GET', originalUrl: url, xhr, get: () => accept };

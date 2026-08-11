@@ -8,6 +8,7 @@ const authService = require('./services/authService');
 const businessService = require('./services/businessService');
 const qrService = require('./services/qrService');
 const menuService = require('./services/menuService');
+const { createLogger } = require('./services/logger');
 
 // Composition root: el ÚNICO lugar del código que construye dependencias.
 // Todo lo demás las recibe.
@@ -38,6 +39,7 @@ function buildRepos(db) {
 }
 
 function createContainer(config) {
+  const logger = createLogger(config.log);
   const pool = createPool(config.db);
   const repos = buildRepos(pool);
 
@@ -77,6 +79,7 @@ function createContainer(config) {
 
   return {
     config,
+    logger,
     pool,
     repos,
     services,

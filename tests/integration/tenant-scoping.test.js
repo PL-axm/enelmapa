@@ -2,6 +2,7 @@ const request = require('supertest');
 const { createTestApp, getTestPool } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createTwoBusinesses } = require('../helpers/fixtures');
+const { loginAdmin } = require('../helpers/sesion');
 
 const app = createTestApp();
 
@@ -21,13 +22,10 @@ describe('tenant scoping (business_id)', () => {
     businessA = businesses.businessA;
     businessB = businesses.businessB;
 
-    agentA = request.agent(app);
-    await agentA.post('/admin/login').type('form')
-      .send({ email: businessA.adminEmail, password: businessA.adminPassword });
-
-    agentB = request.agent(app);
-    await agentB.post('/admin/login').type('form')
-      .send({ email: businessB.adminEmail, password: businessB.adminPassword });
+    // Los agentes vienen con el token CSRF ya adjuntado: desde que hay CSRF,
+    // toda mutación lo necesita.
+    agentA = await loginAdmin(app, { email: businessA.adminEmail, password: businessA.adminPassword });
+    agentB = await loginAdmin(app, { email: businessB.adminEmail, password: businessB.adminPassword });
   });
 
   afterAll(async () => {
