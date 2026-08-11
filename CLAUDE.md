@@ -54,7 +54,16 @@ A business is addressed two ways, both handled by `middleware/tenant.js`:
 
 ### Database (MySQL via `mysql2/promise`)
 
-`db/pool.js` exports `createPool(config.db)` — a factory, not a singleton. `db/schema.js` is now only `initDb(pool)`, run once at server startup (`server.js`) before `app.listen`. There is no migration framework: schema evolution is done by adding new `CREATE TABLE IF NOT EXISTS` blocks and/or best-effort `ALTER TABLE` statements wrapped in `try/catch` (see the `menu_theme` column add in `initDb`) so re-running is always safe. Follow this pattern for new columns/tables rather than introducing a migration tool.
+`db/pool.js` exports `createPool(config.db)` — a factory, not a singleton.
+
+**Schema changes go in `db/migrations/`.** Add a new `NNN_name.sql` file; the runner (`db/migrate.js`) applies pending files in alphabetical order at startup and records each one in `schema_migrations`. Keep the numeric prefix zero-padded (`004_`, not `4_`) or the ordering breaks at the tenth migration.
+
+Two constraints worth knowing before writing one:
+
+- **There is no rollback.** MySQL DDL is auto-commit, so a half-applied `ALTER` cannot be undone by a transaction. Keep each migration small and idempotent — `CREATE TABLE IF NOT EXISTS`, and for columns the `information_schema` + `PREPARE` guard used in `002_menu_theme.sql`, since MySQL has no `ADD COLUMN IF NOT EXISTS`.
+- **Migrations run on their own connection** with `multipleStatements` enabled. The app pool does not have it and must not get it: enabling it there would turn any injection into arbitrary statement chaining.
+
+`001_initial.sql` is the schema frozen at the point migrations were introduced, written with `IF NOT EXISTS` so it is a no-op against the production database that already had those tables.
 
 Core tables: `businesses` (1 per tenant, has `slug`, contact/social fields, `is_open`, `menu_theme`) → `business_hours` (7 rows/business), `categories` → `products`, and `users` (admin logins, one business each via `business_id` FK). All tenant-scoped queries filter by `business_id`.
 

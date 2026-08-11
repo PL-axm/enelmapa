@@ -1,7 +1,7 @@
 const { loadConfig } = require('./config');
 const { createContainer } = require('./container');
 const { createApp } = require('./app');
-const { initDb } = require('./db/schema');
+const { runMigrations } = require('./db/migrate');
 
 // Bootstrap: config → container → schema → app → listen. El orden importa y
 // ahora está escrito en un solo lugar, en vez de repartido entre efectos de
@@ -33,7 +33,14 @@ function warnAboutSecureCookie() {
     'Destrabe temporal: COOKIE_SECURE=false');
 }
 
-initDb(container.pool).then(() => {
+// Las migraciones corren ANTES de escuchar: si el schema no está donde el
+// código espera, es mejor no aceptar tráfico. Usan su propia conexión, no el
+// pool de la app (ver db/migrate.js).
+runMigrations(config.db, container.logger).then(({ aplicadas }) => {
+  if (aplicadas.length > 0) {
+    container.logger.info('Schema actualizado', { migraciones: aplicadas });
+  }
+
   // Se le pasa el container tal cual y `createApp` destructura lo que usa. La
   // primera versión enumeraba las dependencias acá una por una, y agregar
   // `repos` en la Fase 4 significó olvidarse de sumarlas en este call site: la

@@ -38,10 +38,13 @@ npm test
   `getTestRepos()`, `getTestContainer()`. Desde la Fase 3 la app se construye
   con dependencias inyectadas, así que un test la arma acá en vez de
   `require('../../app')`.
-- `tests/helpers/db.js` — `resetDb()` (limpia todo antes de cada test,
-  `initDb()` + `DELETE FROM businesses`, cascada por FK) y `closeDb()`
-  (cierra el pool al final, si no Jest queda colgado esperando que se
-  cierren las conexiones).
+- `tests/helpers/db.js` — `resetDb()` (aplica las migraciones pendientes y
+  hace `DELETE FROM businesses`, que limpia el resto en cascada por FK) y
+  `closeDb()` (cierra el pool y el store de sesión al final; si no, Jest queda
+  colgado esperando el timer de limpieza del store).
+- `tests/helpers/sesion.js` — `loginAdmin()` / `loginSuperadmin()`, que hacen
+  login **y adjuntan el token CSRF**. Desde que hay CSRF toda mutación lo
+  necesita, y la suite no lo desactiva: usa el stack real.
 - `tests/helpers/fixtures.js` — `createBusiness(...)` /
   `createTwoBusinesses()` para levantar negocios de prueba completos
   (admin, categoría, producto) rápido en cualquier test nuevo.
@@ -53,6 +56,9 @@ npm test
 
 ## Gotchas
 
+- **Un solo `afterAll(closeDb)` por ARCHIVO**, no por `describe`: el `afterAll`
+  de un bloque corre al terminar ese bloque, así que cerrar el pool ahí deja al
+  siguiente `describe` del mismo archivo sin conexión.
 - **`--runInBand` es obligatorio** (ya está en el script `test` de
   `package.json`). No hay transacciones ni sandboxing por test — todos
   comparten la misma DB `enelmapa_test`, así que dos archivos corriendo en

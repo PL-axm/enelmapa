@@ -38,7 +38,7 @@ describe('loadConfig', () => {
   });
 
   // Fase 3: la config de DB y las credenciales del superadmin salieron de
-  // db/schema.js y services/superadminAuth.js, que leían process.env por su
+  // db/pool.js y services/superadminAuth.js, que leían process.env por su
   // cuenta. Acá se verifica que el traslado no perdió ningún default.
   describe('db', () => {
     test('toma las env vars de conexión', () => {
