@@ -172,8 +172,9 @@ Detalle completo (estructura de `tests/`, cómo agregar un test, gotchas) en
   `CLAUDE.md`).
 - Vistas EJS con CSS inline por página (no hay hoja de estilos compartida,
   cada `views/admin/*.ejs` repite su propio `<style>` — igual que
-  `partials/admin-layout.ejs`). Seguir el mismo patrón visual (paleta
-  `#C8956C` acento, `#1A1917` sidebar) en vez de introducir un sistema nuevo.
+  `partials/admin-head.ejs`, que es el que incluyen las cinco páginas del
+  panel). Seguir el mismo patrón visual (paleta `#C8956C` acento, `#1A1917`
+  sidebar) en vez de introducir un sistema nuevo.
 - Subida de imágenes: `multer.diskStorage` a `uploads/<businessId>/`, nombre
   randomizado, servido estático en `/uploads`. Cualquier upload nuevo debe
   seguir ese mismo patrón (ver `routes/api/index.js:9-20`).
