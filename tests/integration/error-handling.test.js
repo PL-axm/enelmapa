@@ -2,6 +2,7 @@ const request = require('supertest');
 const { createTestApp } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createBusiness } = require('../helpers/fixtures');
+const { loginAdmin } = require('../helpers/sesion');
 
 const app = createTestApp();
 
@@ -73,9 +74,9 @@ describe('manejo de errores', () => {
         adminPassword: 'password-errores-123'
       });
 
-      const agent = request.agent(app);
-      await agent.post('/admin/login').type('form')
-        .send({ email: business.adminEmail, password: business.adminPassword });
+      const agent = await loginAdmin(app, {
+        email: business.adminEmail, password: business.adminPassword
+      });
 
       const res = await agent.delete('/api/products/no-soy-un-numero');
       expect(res.status).toBe(400);

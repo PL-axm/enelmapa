@@ -68,6 +68,12 @@ function loadConfig(env = process.env) {
       passwordHash: env.SUPER_PASS_HASH || null,
       password: env.SUPER_PASS || DEFAULT_SUPER_PASS
     },
+    // `silent` en los tests: la suite provoca cientos de errores a propósito y
+    // el log los mezclaría con las fallas reales de jest.
+    log: {
+      level: env.LOG_LEVEL || (isProduction ? 'info' : 'debug'),
+      silent: env.LOG_SILENT === 'true'
+    },
     rateLimit: {
       windowMs: intOrDefault(env.RATE_LIMIT_WINDOW_MIN, DEFAULT_RATE_WINDOW_MIN) * 60 * 1000,
       loginMax: intOrDefault(env.RATE_LIMIT_LOGIN_MAX, DEFAULT_LOGIN_MAX),

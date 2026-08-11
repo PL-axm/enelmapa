@@ -2,6 +2,7 @@ const request = require('supertest');
 const { createTestApp, getTestPool } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createBusiness } = require('../helpers/fixtures');
+const { loginAdmin } = require('../helpers/sesion');
 
 const app = createTestApp();
 
@@ -26,9 +27,7 @@ describe('parámetros y orden de rutas en /api', () => {
       adminPassword: 'password-params-123'
     });
 
-    agent = request.agent(app);
-    await agent.post('/admin/login').type('form')
-      .send({ email: business.adminEmail, password: business.adminPassword });
+    agent = await loginAdmin(app, { email: business.adminEmail, password: business.adminPassword });
   });
 
   afterAll(async () => {

@@ -14,3 +14,7 @@ process.env.SESSION_SECRET = 'test-secret-not-for-production';
 // tests/integration/rate-limit.test.js.
 process.env.RATE_LIMIT_LOGIN_MAX = '0';
 process.env.RATE_LIMIT_SUPER_MAX = '0';
+
+// La suite provoca cientos de errores a propósito (404, 403, 400). Sin esto el
+// log los mezcla con la salida de jest y no se distingue una falla real.
+process.env.LOG_SILENT = 'true';

@@ -18,19 +18,21 @@ function notFoundHandler(req, res, next) {
 // `require('../config')` a nivel de módulo, así que la rama de producción
 // —enmascarar el mensaje de un 500— no se podía testear sin manipular el
 // registro de módulos de Jest. Ahora es un parámetro.
-function createErrorHandler({ config }) {
+function createErrorHandler({ config, logger }) {
   return function errorHandler(err, req, res, next) {
     const statusCode = err.statusCode || 500;
     const isServerError = statusCode >= 500;
 
     // Los errores previstos (403 de categoría ajena, 404 de negocio) no
     // necesitan stack trace: son parte del funcionamiento normal. Los otros sí,
-    // porque son lo único que delata un bug — hoy la terminal es la única red
-    // de seguridad que hay (ver QA_CHECKLIST.md).
+    // porque son lo único que delata un bug — la terminal sigue siendo la única
+    // red de seguridad que hay (ver QA_CHECKLIST.md).
+    const contexto = { method: req.method, url: req.originalUrl, status: statusCode };
+
     if (isServerError || !err.expected) {
-      console.error('[' + req.method + ' ' + req.originalUrl + ']', err);
+      logger.excepcion('Error no previsto', err, contexto);
     } else {
-      console.warn('[' + req.method + ' ' + req.originalUrl + '] ' + err.name + ': ' + err.message);
+      logger.warn(err.name + ': ' + err.message, contexto);
     }
 
     // Si la respuesta ya empezó a mandarse no se puede cambiar el status;

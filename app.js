@@ -5,6 +5,7 @@ const path = require('path');
 const asyncHandler = require('./middleware/asyncHandler');
 const { createErrorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const createTenantMiddleware = require('./middleware/tenant');
+const csrf = require('./middleware/csrf');
 const createPublicRouter = require('./routes/public');
 const createAdminRouter = require('./routes/admin');
 const createSuperadminRouter = require('./routes/superadmin');
@@ -20,7 +21,7 @@ const { getSubdomain } = require('./services/subdomain');
 // repositories/, así que la app se arma sólo con repos y config. Que `pool` no
 // aparezca en ninguna firma de router es la señal de que la migración está
 // completa.
-function createApp({ repos, services, config, sessionStore }) {
+function createApp({ repos, services, config, sessionStore, logger }) {
   const app = express();
 
   app.set('view engine', 'ejs');
@@ -39,6 +40,16 @@ function createApp({ repos, services, config, sessionStore }) {
 
   // El store entra acá, no en config.session: config no conoce el pool.
   app.use(session({ ...config.session, store: sessionStore }));
+
+  // CSRF: `provide` expone el token a las vistas, `protect` lo verifica en las
+  // mutaciones. Van después de la sesión (de donde sale el token) y del parser
+  // del cuerpo (de donde sale el `_csrf` de los formularios), y antes de los
+  // routers.
+  //
+  // Los dos logins están exentos: son las únicas mutaciones sin sesión previa,
+  // así que no puede haber token todavía. Ver el comentario de middleware/csrf.
+  app.use(csrf.provide);
+  app.use(csrf.createProtect({ exentas: ['/admin/login', '/superadmin/login'] }));
 
   const tenantMiddleware = createTenantMiddleware({ repos });
   const publicRoutes = createPublicRouter({ services });
@@ -72,7 +83,7 @@ function createApp({ repos, services, config, sessionStore }) {
   // 404, y el error handler tiene que ser el último `app.use` de todos para ver
   // lo que le llegue por `next(err)` desde cualquier punto de la cadena.
   app.use(notFoundHandler);
-  app.use(createErrorHandler({ config }));
+  app.use(createErrorHandler({ config, logger }));
 
   return app;
 }

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><%= title %> - Admin EnElMapa</title>
+<meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: #F5F3EE; color: #1A1A18; }
@@ -108,8 +109,18 @@ async function apiFetch(url, options) {
   var box = document.getElementById('apiError');
   box.style.display = 'none';
 
+  // El token CSRF va por header y no en el cuerpo, y es a propósito: los
+  // formularios con imagen se envían como multipart, que el servidor no parsea
+  // hasta que corre multer — o sea después de la verificación. Por header
+  // funciona igual para JSON, FormData y DELETE sin cuerpo.
+  var meta = document.querySelector('meta[name="csrf-token"]');
+  var opciones = Object.assign({}, options);
+  opciones.headers = Object.assign({}, options && options.headers, {
+    'X-CSRF-Token': meta ? meta.getAttribute('content') : ''
+  });
+
   try {
-    var res = await fetch(url, options);
+    var res = await fetch(url, opciones);
     if (res.ok) return true;
 
     var mensaje = 'No se pudo completar la operación.';
