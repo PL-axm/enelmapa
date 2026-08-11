@@ -38,10 +38,13 @@ npm test
   `getTestRepos()`, `getTestContainer()`. Desde la Fase 3 la app se construye
   con dependencias inyectadas, así que un test la arma acá en vez de
   `require('../../app')`.
-- `tests/helpers/db.js` — `resetDb()` (limpia todo antes de cada test,
-  `initDb()` + `DELETE FROM businesses`, cascada por FK) y `closeDb()`
-  (cierra el pool al final, si no Jest queda colgado esperando que se
-  cierren las conexiones).
+- `tests/helpers/db.js` — `resetDb()` (aplica las migraciones pendientes y
+  hace `DELETE FROM businesses`, que limpia el resto en cascada por FK) y
+  `closeDb()` (cierra el pool y el store de sesión al final; si no, Jest queda
+  colgado esperando el timer de limpieza del store).
+- `tests/helpers/sesion.js` — `loginAdmin()` / `loginSuperadmin()`, que hacen
+  login **y adjuntan el token CSRF**. Desde que hay CSRF toda mutación lo
+  necesita, y la suite no lo desactiva: usa el stack real.
 - `tests/helpers/fixtures.js` — `createBusiness(...)` /
   `createTwoBusinesses()` para levantar negocios de prueba completos
   (admin, categoría, producto) rápido en cualquier test nuevo.
@@ -53,6 +56,9 @@ npm test
 
 ## Gotchas
 
+- **Un solo `afterAll(closeDb)` por ARCHIVO**, no por `describe`: el `afterAll`
+  de un bloque corre al terminar ese bloque, así que cerrar el pool ahí deja al
+  siguiente `describe` del mismo archivo sin conexión.
 - **`--runInBand` es obligatorio** (ya está en el script `test` de
   `package.json`). No hay transacciones ni sandboxing por test — todos
   comparten la misma DB `enelmapa_test`, así que dos archivos corriendo en
@@ -62,11 +68,21 @@ npm test
   `302` al login. Eso cambió en la Fase 2 (antes `/api` también redirigía, y
   el `fetch()` del panel recibía el HTML del login como si fuera la respuesta
   a su petición). Ver `middleware/auth.js`.
-- Las mutaciones de `/api` todavía responden `{ok:true}` aunque no hayan
-  afectado ninguna fila, así que "no existe", "no es tuyo" y "listo" se ven
-  igual. Es el hallazgo B4, pendiente. Los repos ya devuelven si afectaron
-  algo; los handlers todavía lo ignoran. Los tests verifican el estado real en
-  DB, no el código HTTP — por eso siguen sirviendo para probar aislamiento.
+- Las mutaciones de `/api` que no afectan ninguna fila responden `404`, y es
+  **404 también cuando la fila existe pero es de otro negocio** (cierre de B4).
+  Un `403` ahí confirmaría que ese id existe en otro negocio, y con eso se
+  podrían enumerar los datos ajenos: hay un test que fija que los dos casos son
+  indistinguibles desde afuera.
+- Toda mutación necesita el **token CSRF**. La suite no lo desactiva: usar
+  `loginAdmin()` / `loginSuperadmin()` de `tests/helpers/sesion.js`, que lo
+  adjuntan. Un `request.agent(app)` pelado va a recibir `403` en cualquier POST.
+- El **rate limiting de los logins está desactivado** en la suite
+  (`RATE_LIMIT_LOGIN_MAX=0` en `env.setup.js`), porque hace decenas de logins
+  desde la misma IP. Se prueba aparte, con su propio límite chico, en
+  `tests/integration/rate-limit.test.js`.
+- El **logger está silenciado** (`LOG_SILENT`), porque la suite provoca cientos
+  de errores a propósito y mezclarlos con la salida de jest hace imposible
+  distinguir una falla real.
 - El middleware de subdominio en `app.js` trata cualquier Host con 3+
   partes separadas por punto (cuya primera parte no sea `www`/`admin`) como
   un slug de negocio — incluye IPs tipo `127.0.0.1`. Si un test le pega a

@@ -134,7 +134,7 @@ function businessRepository(db) {
       },
 
       // Las categorías, productos, horarios y usuarios se van en cascada
-      // (ver los ON DELETE CASCADE de db/schema.js).
+      // (ver los ON DELETE CASCADE de db/migrations/001_initial.sql).
       async remove(id) {
         const [result] = await db.query('DELETE FROM businesses WHERE id = ?', [id]);
         return result.affectedRows > 0;

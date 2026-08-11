@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-const { initDb } = require('./schema');
+const { runMigrations } = require('./migrate');
 const { createPool } = require('./pool');
 const { loadConfig } = require('../config');
 const { createContainer } = require('../container');
@@ -187,7 +187,10 @@ async function seed() {
 
   const container = createContainer(config);
   const { pool: db, repos, services } = container;
-  await initDb(db);
+
+  // El seed también migra: una base recién creada tiene que quedar con el
+  // schema al día antes de que se le escriba nada.
+  await runMigrations(config.db, container.logger);
 
   await db.query('DELETE FROM products');
   await db.query('DELETE FROM categories');

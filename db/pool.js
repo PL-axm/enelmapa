@@ -2,7 +2,7 @@ const mysql = require('mysql2/promise');
 
 // Factory, no singleton. Antes `getPool()` guardaba el pool en una variable de
 // módulo y lo creaba leyendo `process.env` directo, así que los seis archivos
-// que hacían `require('../db/schema')` quedaban atados a esa única instancia:
+// que importaban el pool a nivel de módulo quedaban atados a esa instancia:
 // no había forma de inyectar otro pool sin manipular el registro de módulos
 // (hallazgo E2).
 //

@@ -17,10 +17,11 @@ const MySQLStore = require('express-mysql-session')(require('express-session'));
 // siendo uno solo y predecible.
 function createSessionStore(pool) {
   return new MySQLStore({
-    // La tabla se crea sola si no está. Es la única excepción al "no hay
-    // migraciones": la maneja la librería, y el schema versionado de la fase
-    // final va a tener que tenerla en cuenta.
-    createDatabaseTable: true,
+    // La tabla la crea la migración 003, no la librería. Antes era la única
+    // parte del schema fuera del control de las migraciones: la librería
+    // decidía la forma y el momento, y un cambio de versión podía cambiarla
+    // sin dejar registro.
+    createDatabaseTable: false,
 
     // Barrido de sesiones vencidas. Sin esto la tabla crece para siempre,
     // porque expirar una cookie no borra su fila.
