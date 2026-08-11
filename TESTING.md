@@ -68,11 +68,21 @@ npm test
   `302` al login. Eso cambió en la Fase 2 (antes `/api` también redirigía, y
   el `fetch()` del panel recibía el HTML del login como si fuera la respuesta
   a su petición). Ver `middleware/auth.js`.
-- Las mutaciones de `/api` todavía responden `{ok:true}` aunque no hayan
-  afectado ninguna fila, así que "no existe", "no es tuyo" y "listo" se ven
-  igual. Es el hallazgo B4, pendiente. Los repos ya devuelven si afectaron
-  algo; los handlers todavía lo ignoran. Los tests verifican el estado real en
-  DB, no el código HTTP — por eso siguen sirviendo para probar aislamiento.
+- Las mutaciones de `/api` que no afectan ninguna fila responden `404`, y es
+  **404 también cuando la fila existe pero es de otro negocio** (cierre de B4).
+  Un `403` ahí confirmaría que ese id existe en otro negocio, y con eso se
+  podrían enumerar los datos ajenos: hay un test que fija que los dos casos son
+  indistinguibles desde afuera.
+- Toda mutación necesita el **token CSRF**. La suite no lo desactiva: usar
+  `loginAdmin()` / `loginSuperadmin()` de `tests/helpers/sesion.js`, que lo
+  adjuntan. Un `request.agent(app)` pelado va a recibir `403` en cualquier POST.
+- El **rate limiting de los logins está desactivado** en la suite
+  (`RATE_LIMIT_LOGIN_MAX=0` en `env.setup.js`), porque hace decenas de logins
+  desde la misma IP. Se prueba aparte, con su propio límite chico, en
+  `tests/integration/rate-limit.test.js`.
+- El **logger está silenciado** (`LOG_SILENT`), porque la suite provoca cientos
+  de errores a propósito y mezclarlos con la salida de jest hace imposible
+  distinguir una falla real.
 - El middleware de subdominio en `app.js` trata cualquier Host con 3+
   partes separadas por punto (cuya primera parte no sea `www`/`admin`) como
   un slug de negocio — incluye IPs tipo `127.0.0.1`. Si un test le pega a
