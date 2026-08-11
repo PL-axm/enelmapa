@@ -199,15 +199,20 @@ rápida de confirmar sin adivinar: `curl` la página y grepear `menuData`,
 
 ## Problemas conocidos (gotchas)
 
-- **Sesión inestable — causa confirmada** (ver código fuente en
-  `enelmapa/server.js`, clonado después de escribir esto por primera vez): la
-  sesión usa el `MemoryStore` por defecto de `express-session`, sin store
-  persistente. El server corre bajo Phusion Passenger, que recicla procesos
-  Node — cuando eso pasa se pierde la sesión en memoria y una request cae en
-  `302` a `/admin/login` aunque el login anterior haya sido exitoso segundos
-  antes. Mitigación: reintentar login si una request da 302 inesperado; no
-  asumir que la sesión sigue viva entre pasos separados por minutos de
-  conversación. (Detalle completo en el skill `enelmapa-dev`.)
+- **Sesión inestable — ARREGLADO** (2026-08-10). La sesión usaba el
+  `MemoryStore` por defecto de `express-session`, sin store persistente, y el
+  server corre bajo Phusion Passenger, que recicla procesos Node: cuando eso
+  pasaba se perdía la sesión en memoria y una request caía en `302` a
+  `/admin/login` aunque el login hubiera sido exitoso segundos antes. Ahora las
+  sesiones viven en la tabla `sessions` de MySQL (`db/sessionStore.js`), así que
+  sobreviven el reciclado. Se deja escrito porque explica los `302` raros de
+  cualquier registro viejo de estas cargas, y porque contra una versión del
+  server anterior a ese arreglo el síntoma vuelve.
+
+  Dos cosas nuevas de las que sí hay que acordarse al cargar un menú a mano:
+  el logout es **POST** (un `GET /admin/logout` da 404), y toda mutación
+  necesita el token CSRF — en un formulario va como `_csrf`, y desde `fetch`
+  como header `X-CSRF-Token`.
 - Lo que en su momento parecía ser "rutas con/sin `/` final se comportan
   distinto" **no es un patrón real** — revisando las rutas del código
   (`routes/admin.js`) no hay tal distinción. Lo que se observó era la misma

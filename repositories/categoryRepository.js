@@ -82,11 +82,9 @@ function categoryRepository(db) {
           return result.insertId;
         },
 
-        // Devuelve si tocó alguna fila. Hoy los handlers lo ignoran y siguen
-        // respondiendo {ok:true} — cerrar eso es B4, que cambia el contrato de
-        // /api y va en su propia rama (ver plans/fase-4-repositories.md).
-        // La información existe desde acá para que ese cambio sea de una línea
-        // en el handler y no otro refactor.
+        // Devuelve si tocó alguna fila, y el handler responde 404 cuando no.
+        // Antes devolvía `{ok:true}` sin mirar `affectedRows`, así que renombrar
+        // una categoría inexistente o ajena se reportaba como éxito.
         async rename(id, name) {
           const [result] = await db.query(
             'UPDATE categories SET name = ? WHERE id = ? AND business_id = ?',
