@@ -78,13 +78,28 @@ function createUploader() {
   return multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
 }
 
-// Capa 2. Corre después de multer: lee los primeros bytes de cada archivo
-// escrito y, si no es una imagen de verdad, lo borra y corta la request.
-function verificarImagenes(req, res, next) {
-  const archivos = [
+// Los archivos que multer ya escribió en esta request. Sirve tanto para
+// verificarlos como para borrarlos si algo más adelante rechaza la request.
+function archivosDe(req) {
+  return [
     ...(req.file ? [req.file] : []),
     ...Object.values(req.files || {}).flat()
   ];
+}
+
+// Borra lo que multer haya escrito. La usa esta capa y también el middleware de
+// validación: si la validación falla DESPUÉS de la subida, el archivo quedaría
+// huérfano en disco — nadie lo referencia y nadie lo borra.
+function limpiarArchivosSubidos(req) {
+  for (const archivo of archivosDe(req)) {
+    try { fs.unlinkSync(archivo.path); } catch (e) { /* ya no está */ }
+  }
+}
+
+// Capa 2. Corre después de multer: lee los primeros bytes de cada archivo
+// escrito y, si no es una imagen de verdad, lo borra y corta la request.
+function verificarImagenes(req, res, next) {
+  const archivos = archivosDe(req);
 
   for (const archivo of archivos) {
     let cabecera;
@@ -100,9 +115,7 @@ function verificarImagenes(req, res, next) {
     if (!detectarFormato(cabecera)) {
       // Se borran TODOS los archivos de esta request, no sólo el ofensor: si
       // uno era falso, no hay razón para dejar a medias el resto.
-      for (const a of archivos) {
-        try { fs.unlinkSync(a.path); } catch (e) { /* ya no está */ }
-      }
+      limpiarArchivosSubidos(req);
       return next(new ValidationError('El archivo no es una imagen válida'));
     }
   }
@@ -131,6 +144,7 @@ module.exports = {
   createUploader,
   verificarImagenes,
   traducirErroresDeSubida,
+  limpiarArchivosSubidos,
   detectarFormato,
   extensionPermitida
 };
