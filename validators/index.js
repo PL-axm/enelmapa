@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const tema = require('../theme');
 
 // Hasta acá no había ninguna validación de entrada (hallazgo E5): lo que
 // mandaba el cliente llegaba tal cual al SQL. Los síntomas eran tres:
@@ -130,7 +131,11 @@ const schemas = {
     facebook: textoOpcional(100),
     tiktok: textoOpcional(100),
     is_open: checkbox,
-    menu_theme: z.enum(['light', 'dark', 'cream', 'green', 'blue']).optional().default('light'),
+    // La lista sale de `theme/`, no escrita a mano: cuando estaba acá y también
+    // en la vista y también en el CSS del menú, se desincronizó — el panel
+    // ofrecía `navy` y esto aceptaba `blue`, así que la quinta paleta devolvía
+    // 400 y `blue` se guardaba sin tener CSS.
+    menu_theme: z.enum(tema.idsDePaletas()).optional().default(tema.PALETA_POR_DEFECTO),
     hours: horarios
   }),
 

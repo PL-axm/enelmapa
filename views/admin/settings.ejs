@@ -46,35 +46,36 @@
 <div class="card">
   <h3>Tema del menú</h3>
   <p style="font-size:13px;color:#6B6860;margin-bottom:16px">Elige el color de fondo de tu menú digital</p>
+  <%# Las opciones salen de theme/ (paletasParaUI). Antes estaban escritas una
+      por una acá, con el fondo y el color de texto de cada tema copiados a
+      mano: era la cuarta copia de la misma información y la razón de que la
+      lista se desincronizara del validador. Agregar una paleta ahora es tocar
+      un solo archivo. %>
   <div style="display:flex;gap:12px;flex-wrap:wrap">
-    <label style="cursor:pointer;text-align:center">
-      <input type="radio" name="menu_theme" value="light" <%= (business.menu_theme || 'light') === 'light' ? 'checked' : '' %> style="display:none">
-      <div class="theme-option" style="background:#FAFAF7;color:#1A1A18;border:3px solid <%= (business.menu_theme || 'light') === 'light' ? '#C8956C' : '#E8E5DE' %>">Aa</div>
-      <span style="font-size:12px;color:#6B6860">Blanco</span>
-    </label>
-    <label style="cursor:pointer;text-align:center">
-      <input type="radio" name="menu_theme" value="dark" <%= business.menu_theme === 'dark' ? 'checked' : '' %> style="display:none">
-      <div class="theme-option" style="background:#1A1917;color:#F0EDE6;border:3px solid <%= business.menu_theme === 'dark' ? '#C8956C' : '#333' %>">Aa</div>
-      <span style="font-size:12px;color:#6B6860">Oscuro</span>
-    </label>
-    <label style="cursor:pointer;text-align:center">
-      <input type="radio" name="menu_theme" value="cream" <%= business.menu_theme === 'cream' ? 'checked' : '' %> style="display:none">
-      <div class="theme-option" style="background:#F5F0E8;color:#3D3426;border:3px solid <%= business.menu_theme === 'cream' ? '#C8956C' : '#E8E5DE' %>">Aa</div>
-      <span style="font-size:12px;color:#6B6860">Crema</span>
-    </label>
-    <label style="cursor:pointer;text-align:center">
-      <input type="radio" name="menu_theme" value="green" <%= business.menu_theme === 'green' ? 'checked' : '' %> style="display:none">
-      <div class="theme-option" style="background:#1B2E1B;color:#D4E6D4;border:3px solid <%= business.menu_theme === 'green' ? '#C8956C' : '#333' %>">Aa</div>
-      <span style="font-size:12px;color:#6B6860">Verde</span>
-    </label>
-    <label style="cursor:pointer;text-align:center">
-      <input type="radio" name="menu_theme" value="navy" <%= business.menu_theme === 'navy' ? 'checked' : '' %> style="display:none">
-      <div class="theme-option" style="background:#1a1a2e;color:#e0e0e0;border:3px solid <%= business.menu_theme === 'navy' ? '#C8956C' : '#333' %>">Aa</div>
-      <span style="font-size:12px;color:#6B6860">Azul</span>
-    </label>
+    <% paletas.forEach(function(p) { %>
+      <% var elegida = (business.menu_theme || paletaPorDefecto) === p.id; %>
+      <label style="cursor:pointer;text-align:center">
+        <input type="radio" name="menu_theme" value="<%= p.id %>" <%= elegida ? 'checked' : '' %> style="display:none">
+        <div class="theme-option" data-borde="<%= p.borde %>"
+             style="background:<%= p.fondo %>;color:<%= p.texto %>;border:3px solid <%= elegida ? '#C8956C' : p.borde %>">Aa</div>
+        <span style="font-size:12px;color:#6B6860"><%= p.nombre %></span>
+      </label>
+    <% }) %>
   </div>
   <style>.theme-option{width:60px;height:60px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;margin-bottom:4px;transition:border-color .2s;}</style>
-  <script>document.querySelectorAll('input[name="menu_theme"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.theme-option').forEach(function(d){d.style.borderColor='#E8E5DE'});this.parentElement.querySelector('.theme-option').style.borderColor='#C8956C'})});</script>
+  <%# Al deseleccionar se vuelve al borde de la propia paleta (data-borde), no a
+      uno fijo: el código anterior reseteaba todo a #E8E5DE, que sobre las
+      paletas oscuras dejaba un marco claro donde antes no había ninguno. %>
+  <script>
+    document.querySelectorAll('input[name="menu_theme"]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        document.querySelectorAll('.theme-option').forEach(function (d) {
+          d.style.borderColor = d.dataset.borde;
+        });
+        this.parentElement.querySelector('.theme-option').style.borderColor = '#C8956C';
+      });
+    });
+  </script>
 </div>
 
 <div class="card">

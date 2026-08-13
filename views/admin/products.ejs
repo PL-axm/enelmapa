@@ -26,7 +26,11 @@
             <td><%= p.category_name %></td>
             <td style="font-weight:600;color:#C8956C">$ <%= Math.round(p.price).toLocaleString('es-CO') %></td>
             <td>
-              <button class="btn btn-secondary btn-sm" onclick='editProd(<%- JSON.stringify({id:p.id,name:p.name,description:p.description||"",price:p.price,category_id:p.category_id,image:p.image||"",is_active:p.is_active}) %>)'>Editar</button>
+              <%# `jsonInline` escapa la comilla simple, que es la que delimita este
+                  atributo. Con `JSON.stringify` el valor terminaba en el primer
+                  apóstrofo del contenido: la descripción de "Cazuela Chidas" dice
+                  `pico e' gallo`, y el botón Editar de ese producto no funcionaba. %>
+              <button class="btn btn-secondary btn-sm" onclick='editProd(<%- jsonInline({id:p.id,name:p.name,description:p.description||"",price:p.price,category_id:p.category_id,image:p.image||"",is_active:p.is_active}) %>)'>Editar</button>
               <button class="btn btn-danger btn-sm" onclick="deleteProd(<%= p.id %>, '<%= p.name.replace(/'/g,"\\'") %>')">Eliminar</button>
             </td>
           </tr>
