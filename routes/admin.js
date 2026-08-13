@@ -69,10 +69,12 @@ function createAdminRouter({ repos, services, config }) {
       session: req.session,
       business,
       hours,
-      // Las opciones de paleta salen de theme/, la misma fuente que valida el
-      // POST. Escritas en la vista se desincronizaban.
+      // Las opciones de paleta y escala salen de theme/, la misma fuente que
+      // valida el POST. Escritas en la vista se desincronizaban.
       paletas: tema.paletasParaUI(),
-      paletaPorDefecto: tema.PALETA_POR_DEFECTO
+      paletaPorDefecto: tema.PALETA_POR_DEFECTO,
+      escalas: tema.escalasParaUI(),
+      escalaPorDefecto: tema.ESCALA_POR_DEFECTO
     });
   }));
 

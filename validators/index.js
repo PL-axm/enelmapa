@@ -136,6 +136,7 @@ const schemas = {
     // ofrecía `navy` y esto aceptaba `blue`, así que la quinta paleta devolvía
     // 400 y `blue` se guardaba sin tener CSS.
     menu_theme: z.enum(tema.idsDePaletas()).optional().default(tema.PALETA_POR_DEFECTO),
+    menu_scale: z.enum(tema.idsDeEscalas()).optional().default(tema.ESCALA_POR_DEFECTO),
     hours: horarios
   }),
 

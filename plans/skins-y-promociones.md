@@ -331,7 +331,7 @@ de la sección). La única diferencia en toda la página es que las tarjetas de 
 **búsqueda** ahora traen `alt` en la imagen, porque usan el constructor
 compartido y el viejo código de búsqueda no lo ponía.
 
-### Fase 3 — Escala tipográfica + selector en Configuración
+### Fase 3 — Escala tipográfica + selector en Configuración ✅
 
 - `menu_scale` con 3-4 presets (`compacto` / `normal` / `grande` / `extra`) como
   variables CSS: `--fs-titulo-categoria`, `--fs-nombre`, `--fs-desc`,

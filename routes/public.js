@@ -1,6 +1,6 @@
 const express = require('express');
 const jsonInline = require('../services/jsonInline');
-const { cssDePaleta, plantillaOPorDefecto } = require('../theme');
+const { cssDePaleta, cssDeEscala, plantillaOPorDefecto } = require('../theme');
 
 // Este router no sabe qué tenant está renderizando: sólo pasa lo que
 // `middleware/tenant.js` dejó en req por `menuService` y renderiza. El armado
@@ -27,7 +27,8 @@ function createPublicRouter({ services }) {
       // de por `app.locals` para que se vea de dónde salen. Sólo esta vista los
       // usa, así que no hay nada que compartir globalmente.
       jsonInline,
-      cssDePaleta
+      cssDePaleta,
+      cssDeEscala
     });
   });
 
