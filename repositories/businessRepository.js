@@ -17,7 +17,7 @@
 
 const TENANT_FIELDS = [
   'name', 'address', 'phone', 'whatsapp', 'instagram', 'facebook', 'tiktok',
-  'is_open', 'menu_theme', 'banner_img', 'logo_img'
+  'is_open', 'menu_theme', 'menu_scale', 'banner_img', 'logo_img'
 ];
 
 // Sólo se escriben las columnas presentes en `data`, y sólo si están en la

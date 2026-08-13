@@ -1,5 +1,6 @@
 const { PALETAS, VARIABLES, POR_DEFECTO } = require('./paletas');
 const templates = require('./templates');
+const escalas = require('./escalas');
 
 // La cara pública de `theme/`: lo que consumen el validador, la vista de
 // configuración y el menú. Los tres leen de acá, así que no puede volver a
@@ -77,5 +78,15 @@ module.exports = {
   TEMPLATE_POR_DEFECTO: templates.TEMPLATE_POR_DEFECTO,
   idsDeTemplates: templates.idsDeTemplates,
   esTemplateValido: templates.esTemplateValido,
-  plantillaOPorDefecto: templates.plantillaOPorDefecto
+  plantillaOPorDefecto: templates.plantillaOPorDefecto,
+
+  // La escala tipográfica: el tercer eje. Paleta = color, template = layout,
+  // escala = tamaño. Los tres independientes: cualquier combinación es válida.
+  ESCALAS: escalas.ESCALAS,
+  ESCALA_POR_DEFECTO: escalas.ESCALA_POR_DEFECTO,
+  idsDeEscalas: escalas.idsDeEscalas,
+  esEscalaValida: escalas.esEscalaValida,
+  escalaOPorDefecto: escalas.escalaOPorDefecto,
+  cssDeEscala: escalas.cssDeEscala,
+  escalasParaUI: escalas.escalasParaUI
 };

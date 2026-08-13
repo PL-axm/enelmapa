@@ -47,7 +47,7 @@ function createApiRouter({ repos, services }) {
     { name: 'banner', maxCount: 1 },
     { name: 'logo', maxCount: 1 }
   ]), verificarImagenes, validate(schemas.settings), asyncHandler(async (req, res) => {
-    const { name, address, phone, whatsapp, instagram, facebook, tiktok, is_open, menu_theme, hours } = req.body;
+    const { name, address, phone, whatsapp, instagram, facebook, tiktok, is_open, menu_theme, menu_scale, hours } = req.body;
 
     let banner_img, logo_img;
     if (req.files?.banner) banner_img = '/uploads/' + req.session.businessId + '/' + req.files.banner[0].filename;
@@ -57,9 +57,13 @@ function createApiRouter({ repos, services }) {
 
     // El repo filtra por lista blanca: aunque el cliente mande `slug` o `id`
     // en el formulario, desde acá no se pueden tocar.
+    // Ojo al agregar un campo nuevo de `businesses`: hay que tocarlo en TRES
+    // lugares —el esquema de validators/, la lista blanca del repo, y este
+    // destructurado— y si falta el tercero el guardado responde 200 sin guardar
+    // nada. Pasó con `menu_scale` y lo agarró su test de integración.
     await scope.update({
       name, address, phone, whatsapp, instagram, facebook, tiktok,
-      is_open, menu_theme, banner_img, logo_img
+      is_open, menu_theme, menu_scale, banner_img, logo_img
     });
 
     // Ya viene parseado y validado por el esquema: el try/catch del JSON y el

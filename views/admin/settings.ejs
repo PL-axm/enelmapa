@@ -63,6 +63,36 @@
     <% }) %>
   </div>
   <style>.theme-option{width:60px;height:60px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;margin-bottom:4px;transition:border-color .2s;}</style>
+
+  <%# La vista previa de cada escala usa el propio factor para dibujar el "Aa", así
+      que lo que se ve es literalmente lo que va a pasar en el menú. Si mañana se
+      cambia un factor en theme/escalas.js, esto lo refleja sin tocar nada. %>
+  <h3 style="margin-top:28px">Tamaño del texto</h3>
+  <p style="font-size:13px;color:#6B6860;margin-bottom:16px">Afecta los títulos de categoría, los nombres, las descripciones y los precios de tu menú</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <% escalas.forEach(function(e) { %>
+      <% var elegida = (business.menu_scale || escalaPorDefecto) === e.id; %>
+      <label style="cursor:pointer;text-align:center">
+        <input type="radio" name="menu_scale" value="<%= e.id %>" <%= elegida ? 'checked' : '' %> style="display:none">
+        <div class="scale-option" style="border-color:<%= elegida ? '#C8956C' : '#E8E5DE' %>">
+          <span style="font-size:<%= Math.round(20 * e.factor) %>px">Aa</span>
+        </div>
+        <span style="font-size:12px;color:#6B6860;display:block"><%= e.nombre %></span>
+        <span style="font-size:11px;color:#9C9889"><%= e.descripcion %></span>
+      </label>
+    <% }) %>
+  </div>
+  <style>.scale-option{width:60px;height:60px;border-radius:10px;border:3px solid #E8E5DE;background:#FAFAF7;color:#1A1A18;display:flex;align-items:center;justify-content:center;font-weight:700;margin-bottom:4px;transition:border-color .2s;}</style>
+  <script>
+    document.querySelectorAll('input[name="menu_scale"]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        document.querySelectorAll('.scale-option').forEach(function (d) {
+          d.style.borderColor = '#E8E5DE';
+        });
+        this.parentElement.querySelector('.scale-option').style.borderColor = '#C8956C';
+      });
+    });
+  </script>
   <%# Al deseleccionar se vuelve al borde de la propia paleta (data-borde), no a
       uno fijo: el código anterior reseteaba todo a #E8E5DE, que sobre las
       paletas oscuras dejaba un marco claro donde antes no había ninguno. %>
