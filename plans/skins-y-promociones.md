@@ -268,7 +268,7 @@ Nada de SQL en rutas, nada de `process.env` fuera de `config/`, nada de
 
 Una rama por fase, cada una mergeable y verificable sola.
 
-### Fase 0 — Poner el skill y la doc al día
+### Fase 0 — Poner el skill y la doc al día ✅
 
 Sólo documentación, sin código. Va primero porque es lo que hace que las fases
 siguientes se escriban contra la arquitectura real.
@@ -283,7 +283,7 @@ siguientes se escriban contra la arquitectura real.
 - **Criterio de aceptación**: ninguna afirmación del skill contradice al código.
   Se verifica una por una, no en bloque.
 
-### Fase 1 — Fuente única del tema + los dos XSS
+### Fase 1 — Fuente única del tema + los dos XSS ✅
 
 Sin cambio visual. Es la más chica y arregla lo que ya está roto.
 
@@ -296,18 +296,40 @@ Sin cambio visual. Es la más chica y arregla lo que ya está roto.
 - **Criterio de aceptación**: las 5 paletas se guardan y se ven; el menú de El
   Silvestre queda idéntico al de antes.
 
-### Fase 2 — Extraer el skin actual
+### Fase 2 — Extraer el skin actual ✅
 
 Refactor puro, riesgo concentrado en el front.
 
 - `menu.ejs` → armazón + `views/menu/clasico.ejs`.
 - Contrato `window.SKIN`, con la búsqueda usando el mismo constructor (cierra el
   bug 3).
-- `menu_template` en la migración, en `TENANT_FIELDS` y en el validador, con
-  `clasico` por default. Todavía sin segundo skin.
+- `menu_template` en la migración, con `clasico` por default. Todavía sin segundo
+  skin.
 - **Criterio de aceptación**: capturas antes/después **idénticas** en las 5
   paletas y en los tres breakpoints (380 / 600 / 901+). Si algo se corrió un
   píxel, no está terminada. Esta fase no agrega nada: si se nota, salió mal.
+
+**Dos desviaciones del plan original, con su motivo:**
+
+- `menu_template` **no** entra al validador ni a `TENANT_FIELDS` todavía. Con un
+  solo skin no hay nada que elegir, y agregar un campo que ninguna pantalla
+  escribe deja un camino de escritura inalcanzable —o peor, alcanzable sin UI que
+  lo valide visualmente—. Entra en la Fase 6, junto con el selector.
+- `theme/escalas.js` tampoco se crea acá. El plan lo listaba en la Fase 1, pero
+  un módulo sin consumidor es código muerto: se agrega en la Fase 3, que es
+  cuando existe quien lo use.
+
+Cómo se verificó la identidad visual, que era el punto: se capturó el HTML
+renderizado de dos negocios en las 5 paletas antes y después, se normalizaron
+todas las reglas CSS a `@media|selector → declaraciones ordenadas` y se
+compararon como conjuntos — **95 reglas, cero diferencias en las 5 paletas**. La
+comparación incluye el contexto `@media` en la clave, así que una regla que se
+hubiera ido al breakpoint equivocado al partir los archivos aparecería como
+faltante. Y el DOM ya renderizado por el JS se comparó por hash: **idéntico**
+(mismo hash, mismo largo, 46 tarjetas, 9 secciones, tarjetas como hijas directas
+de la sección). La única diferencia en toda la página es que las tarjetas de la
+**búsqueda** ahora traen `alt` en la imagen, porque usan el constructor
+compartido y el viejo código de búsqueda no lo ponía.
 
 ### Fase 3 — Escala tipográfica + selector en Configuración
 

@@ -55,15 +55,19 @@ describe('inyección a través de datos del negocio', () => {
       expect(res.text).toContain('\\u003c/script\\u003e');
     });
 
-    test('hay exactamente un cierre de </script> en la página', async () => {
-      // Más directo que buscar el payload: si el dato hubiera abierto uno de
-      // más, acá se ve. La página tiene un solo `<script>`.
+    test('las etiquetas <script> quedan balanceadas', async () => {
+      // Más directo que buscar el payload: un `</script>` que venga del dato no
+      // tiene apertura, así que las cuentas se desbalancean. Se comparan entre sí
+      // en vez de fijar un número, porque desde la Fase 2 la página trae el
+      // script del armazón más el del skin, y van a ser más cuando haya otros.
       await crearProducto(business, { name: PAYLOAD_SCRIPT, description: '' });
 
       const res = await request(app).get('/s/test-inyeccion');
+      const aperturas = (res.text.match(/<script[\s>]/g) || []).length;
       const cierres = (res.text.match(/<\/script>/g) || []).length;
 
-      expect(cierres).toBe(1);
+      expect(cierres).toBe(aperturas);
+      expect(aperturas).toBeGreaterThan(0);
     });
 
     test('el dato sigue llegando entero al cliente', async () => {

@@ -1,0 +1,111 @@
+<%#
+  Skin "clásico" — el layout que el menú tuvo siempre: una lista, texto a la
+  izquierda, foto chica a la derecha.
+
+  Un skin trae dos cosas y nada más: su CSS y su `window.SKIN`. Todo lo demás
+  —banner, encabezado, nav de categorías, buscador, modal de producto, modal de
+  información, footer, FAB de WhatsApp— es del armazón (views/menu.ejs) y se
+  comparte entre skins. Si algo de eso hay que tocar, se toca ahí una vez.
+
+  El contrato es chico a propósito:
+
+    SKIN.contenedorProductos()        -> dónde van las tarjetas de una categoría
+    SKIN.tarjetaProducto(p, helpers)  -> el nodo de una tarjeta
+
+  `helpers` trae `formatPrice`. Se pasa como argumento en vez de leer un global:
+  este script corre en el `<head>`, antes de que el armazón defina nada, y
+  depender de un global que "ya va a estar" es la clase de acoplamiento que
+  después nadie encuentra.
+
+  El armazón llama a `tarjetaProducto` en DOS lugares: el menú y los resultados
+  de la búsqueda. Antes cada uno armaba su propia tarjeta, y la de la búsqueda lo
+  hacía con `innerHTML` concatenando el nombre del producto — o sea inyección con
+  el dato del negocio. Con un solo constructor eso no se puede volver a escribir
+  de dos formas distintas.
+%>
+<style>
+  .menu-content { padding: 0 16px 80px; }
+  .category-section { padding-top: 24px; }
+  .category-title { font-size: 18px; font-weight: 700; color: var(--text-primary); padding-bottom: 14px; margin-bottom: 2px; position: relative; }
+  .category-title::after { content: ''; position: absolute; bottom: 8px; left: 0; width: 32px; height: 2px; background: var(--accent); border-radius: 1px; }
+
+  .product-card { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); cursor: pointer; transition: opacity 0.15s; }
+  .product-card:last-child { border-bottom: none; }
+  .product-card:active { opacity: 0.8; }
+  .product-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+  .product-name { font-size: 14.5px; font-weight: 600; color: var(--text-primary); line-height: 1.35; }
+  .product-desc { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .product-price { font-size: 14px; font-weight: 700; color: var(--accent); margin-top: 6px; }
+  .product-img { width: 90px; height: 90px; border-radius: var(--radius); object-fit: cover; flex-shrink: 0; background: var(--category-bg); }
+
+  @media (max-width: 600px) {
+    .menu-content { padding: 0 14px 100px; }
+    .product-card { gap: 12px; padding: 12px 0; }
+    .product-name { font-size: 14px; }
+    .product-desc { font-size: 12px; }
+    .product-price { font-size: 13.5px; }
+    .product-img { width: 85px; height: 85px; border-radius: 8px; }
+  }
+  @media (max-width: 380px) {
+    .menu-content { padding: 0 12px 100px; }
+    .product-name { font-size: 13.5px; }
+    .product-img { width: 75px; height: 75px; }
+  }
+  @media (min-width: 901px) {
+    .product-img { width: 100px; height: 100px; }
+    .product-card:hover { background: var(--category-bg); margin: 0 -16px; padding-left: 16px; padding-right: 16px; border-radius: var(--radius); }
+  }
+</style>
+<script>
+  window.SKIN = {
+    // Un fragmento y no un `<div>`: así las tarjetas quedan como hijas directas
+    // de `.category-section`, exactamente el DOM que este menú ya tenía. Un
+    // envoltorio de más cambiaría a qué apunta `.product-card:last-child` y el
+    // truco de márgenes negativos del `:hover` en escritorio. El skin en grilla
+    // sí va a devolver un elemento con `display: grid`, y por eso esto es una
+    // decisión del skin y no del armazón.
+    contenedorProductos: function () {
+      return document.createDocumentFragment();
+    },
+
+    tarjetaProducto: function (p, helpers) {
+      var card = document.createElement('div');
+      card.className = 'product-card';
+
+      var info = document.createElement('div');
+      info.className = 'product-info';
+
+      // `textContent` y no `innerHTML`: el nombre y la descripción los escribe
+      // el dueño del negocio y se muestran a cualquiera que abra el menú.
+      var name = document.createElement('div');
+      name.className = 'product-name';
+      name.textContent = p.name;
+      info.appendChild(name);
+
+      if (p.desc) {
+        var desc = document.createElement('div');
+        desc.className = 'product-desc';
+        desc.textContent = p.desc;
+        info.appendChild(desc);
+      }
+
+      var price = document.createElement('div');
+      price.className = 'product-price';
+      price.textContent = helpers.formatPrice(p.price);
+      info.appendChild(price);
+
+      card.appendChild(info);
+
+      if (p.img) {
+        var img = document.createElement('img');
+        img.className = 'product-img';
+        img.src = p.img;
+        img.alt = p.name;
+        img.loading = 'lazy';
+        card.appendChild(img);
+      }
+
+      return card;
+    }
+  };
+</script>

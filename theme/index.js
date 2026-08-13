@@ -1,4 +1,5 @@
 const { PALETAS, VARIABLES, POR_DEFECTO } = require('./paletas');
+const templates = require('./templates');
 
 // La cara pública de `theme/`: lo que consumen el validador, la vista de
 // configuración y el menú. Los tres leen de acá, así que no puede volver a
@@ -68,5 +69,13 @@ module.exports = {
   esPaletaValida,
   paletaOPorDefecto,
   cssDePaleta,
-  paletasParaUI
+  paletasParaUI,
+
+  // Los skins. Se re-exportan desde acá para que quien consume el tema tenga una
+  // sola puerta, igual que con las paletas.
+  TEMPLATES: templates.TEMPLATES,
+  TEMPLATE_POR_DEFECTO: templates.TEMPLATE_POR_DEFECTO,
+  idsDeTemplates: templates.idsDeTemplates,
+  esTemplateValido: templates.esTemplateValido,
+  plantillaOPorDefecto: templates.plantillaOPorDefecto
 };

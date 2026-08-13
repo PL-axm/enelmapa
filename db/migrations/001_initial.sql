@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS businesses (
   logo_img VARCHAR(500) DEFAULT '',
   is_open TINYINT DEFAULT 1,
   menu_theme VARCHAR(20) DEFAULT 'light',
+  -- `menu_template` NO va acá: 001 es el schema congelado al momento de
+  -- introducir migraciones y no se reescribe. La agrega 004.
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
