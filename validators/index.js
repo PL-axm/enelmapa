@@ -71,6 +71,89 @@ const checkbox = z.any().optional().transform((v) => (v ? 1 : 0));
 
 const hora = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Hora inválida (formato HH:MM)');
 
+// === promociones ===
+//
+// El precio promocional es opcional y su AUSENCIA es el interruptor: sin precio
+// no hay promo. El formulario manda '' cuando el campo está vacío, y '' en una
+// columna DECIMAL es 0, o sea "gratis" — por eso vacío se convierte en `null`
+// explícito y no se deja pasar tal cual.
+const precioPromo = z
+  .union([z.literal(''), z.coerce.number()])
+  .optional()
+  .transform((v) => (v === '' || v === undefined ? null : v))
+  .superRefine((v, ctx) => {
+    if (v === null) return;
+    if (!Number.isFinite(v)) {
+      ctx.addIssue({ code: 'custom', message: 'El precio promocional debe ser un número' });
+      return;
+    }
+    if (v < 0) {
+      ctx.addIssue({ code: 'custom', message: 'El precio promocional no puede ser negativo' });
+    }
+  });
+
+// Fecha opcional en formato YYYY-MM-DD, que es lo que manda un <input type=date>.
+// Vacío es `null`: "sin fecha de inicio" y "sin vencimiento" son estados
+// válidos y significan "desde siempre" y "para siempre".
+const fechaOpcional = z
+  .union([z.literal(''), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida (formato AAAA-MM-DD)')])
+  .optional()
+  .transform((v) => (v === '' || v === undefined ? null : v));
+
+// Los días activos, un carácter por día, posición 0 = Domingo.
+//
+// `'0000000'` se RECHAZA: es una promo que nunca se va a mostrar. Guardarla
+// dejaría al dueño mirando un producto con precio promocional que no aparece en
+// ningún lado, sin nada que se lo explique. Vacío o ausente se normaliza a todos
+// los días, que es lo que espera quien cargó un precio y no tocó los días.
+const diasPromo = z
+  .union([z.literal(''), z.string().regex(/^[01]{7}$/, 'Los días de la promoción son inválidos')])
+  .optional()
+  .transform((v) => (v === '' || v === undefined ? '1111111' : v))
+  .superRefine((v, ctx) => {
+    if (v === '0000000') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'La promoción tiene que estar activa al menos un día de la semana'
+      });
+    }
+  });
+
+// Las reglas que cruzan campos, aplicadas al objeto entero. Van en un helper
+// porque valen igual para crear y para editar un producto.
+function refinarPromo(datos, ctx) {
+  if (datos.promo_price === null) return;
+
+  // Una promo más cara que el precio normal es un error de carga, y si se guarda
+  // el menú muestra un tachado absurdo: "$20.000" tachado y "$25.000" al lado.
+  if (datos.promo_price >= datos.price) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['promo_price'],
+      message: 'El precio promocional tiene que ser menor que el precio normal'
+    });
+  }
+
+  if (datos.promo_from && datos.promo_to && datos.promo_from > datos.promo_to) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['promo_to'],
+      message: 'La fecha de fin no puede ser anterior a la de inicio'
+    });
+  }
+}
+
+// Sin precio promocional, el resto de los campos de promo no significan nada.
+// Se limpian en vez de guardarse: una ventana de fechas sin precio es basura que
+// después nadie sabe interpretar, y peor, reaparece si alguien vuelve a poner un
+// precio sin mirar las fechas viejas.
+function limpiarPromoVacia(datos) {
+  if (datos.promo_price === null) {
+    return { ...datos, promo_label: '', promo_from: null, promo_to: null, promo_days: '1111111' };
+  }
+  return datos;
+}
+
 // `hours` llega como un string JSON dentro del formulario. Antes se parseaba
 // con un try/catch en el handler y no se validaba el contenido.
 const horarios = z
@@ -108,8 +191,13 @@ const schemas = {
     name: texto(255, 'El nombre'),
     description: textoOpcional(5000),
     price: precio,
-    category_id: idPositivo('La categoría')
-  }),
+    category_id: idPositivo('La categoría'),
+    promo_price: precioPromo,
+    promo_label: textoOpcional(40),
+    promo_from: fechaOpcional,
+    promo_to: fechaOpcional,
+    promo_days: diasPromo
+  }).superRefine(refinarPromo).transform(limpiarPromoVacia),
 
   productUpdate: z.object({
     name: texto(255, 'El nombre'),
@@ -118,8 +206,13 @@ const schemas = {
     category_id: idPositivo('La categoría'),
     // Ausente significa activo, y sólo el '0' explícito lo desactiva: es la
     // semántica que ya tenía el formulario.
-    is_active: z.any().optional().transform((v) => v !== '0')
-  }),
+    is_active: z.any().optional().transform((v) => v !== '0'),
+    promo_price: precioPromo,
+    promo_label: textoOpcional(40),
+    promo_from: fechaOpcional,
+    promo_to: fechaOpcional,
+    promo_days: diasPromo
+  }).superRefine(refinarPromo).transform(limpiarPromoVacia),
 
   // === ajustes del negocio (el dueño) ===
   settings: z.object({
@@ -137,6 +230,7 @@ const schemas = {
     // 400 y `blue` se guardaba sin tener CSS.
     menu_theme: z.enum(tema.idsDePaletas()).optional().default(tema.PALETA_POR_DEFECTO),
     menu_scale: z.enum(tema.idsDeEscalas()).optional().default(tema.ESCALA_POR_DEFECTO),
+    promos_enabled: checkbox,
     hours: horarios
   }),
 

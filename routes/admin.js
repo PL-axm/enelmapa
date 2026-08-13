@@ -5,6 +5,7 @@ const { createLoginLimiter } = require('../middleware/rateLimit');
 const { regenerarSesion, destruirSesion } = require('../middleware/sesion');
 const jsonInline = require('../services/jsonInline');
 const tema = require('../theme');
+const promos = require('../services/promos');
 
 // Cada handler es leer la sesión, llamar a un repo o servicio, y renderizar.
 // Ni SQL ni bcrypt ni generación de QR: eso vive en repositories/ y services/.
@@ -91,7 +92,21 @@ function createAdminRouter({ repos, services, config }) {
     const categories = await repos.categories.forBusiness(scope).listOrdered();
     const products = await repos.products.forBusiness(scope).listWithCategory();
 
-    res.render('admin/products', { session: req.session, categories, products, jsonInline });
+    // El estado de cada promoción se calcula acá y no en la vista: depende de
+    // qué día es, y la fecha se INYECTA para que el servicio siga siendo puro.
+    // Sin este estado visible, el dueño carga una promo, no la ve en el menú y no
+    // tiene forma de saber por qué — el reclamo garantizado.
+    const hoy = promos.hoyEn(config.zonaHoraria);
+    const conEstado = products.map(p => ({ ...p, promoEstado: promos.estado(p, hoy) }));
+
+    res.render('admin/products', {
+      session: req.session,
+      categories,
+      products: conEstado,
+      jsonInline,
+      etiquetaPromo: promos.etiqueta,
+      aFechaTexto: promos.aFechaTexto
+    });
   }));
 
   router.get('/qr', authRequired, asyncHandler(async (req, res) => {

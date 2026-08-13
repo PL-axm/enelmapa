@@ -343,7 +343,7 @@ compartido y el viejo código de búsqueda no lo ponía.
 - **Criterio de aceptación**: cambiar la escala mueve todo proporcionalmente y
   nada se desborda ni se solapa en 380px, que es donde aprieta.
 
-### Fase 4 — Promociones: datos, reglas y panel
+### Fase 4 — Promociones: datos, reglas y panel ✅
 
 Sin tocar el menú público todavía. Al terminar, el dueño puede cargar promos y no
 se ven en ningún lado — nada se rompe y la fase de mayor riesgo queda partida en

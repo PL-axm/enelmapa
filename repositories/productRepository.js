@@ -1,5 +1,27 @@
 const { ForbiddenError } = require('../errors');
 
+// Normaliza los campos de promoción para escribirlos. `promo` puede no venir
+// —crear un producto sin promo es lo normal— y entonces se escriben los valores
+// de "sin promoción".
+//
+// `promo_price: null` es lo que apaga la promo, y tiene que poder escribirse:
+// dejar la columna sin tocar cuando el campo llega vacío haría que quitar una
+// promoción fuera imposible desde el formulario. Cuidado con `''`: en una
+// columna DECIMAL vale 0, o sea "gratis", así que el validador ya lo convirtió a
+// null y acá se respeta ese null.
+function camposDePromo(promo) {
+  const p = promo || {};
+  const tienePromo = p.promo_price !== null && p.promo_price !== undefined;
+
+  return {
+    promo_price: tienePromo ? p.promo_price : null,
+    promo_label: tienePromo ? (p.promo_label || '') : '',
+    promo_from: tienePromo ? (p.promo_from || null) : null,
+    promo_to: tienePromo ? (p.promo_to || null) : null,
+    promo_days: tienePromo ? (p.promo_days || '1111111') : '1111111'
+  };
+}
+
 // Misma forma que categoryRepository: sólo se entra por `forBusiness`.
 //
 // La diferencia importante está en `create` y `update`. El `AND business_id = ?`
@@ -67,23 +89,30 @@ function productRepository(db, categoryRepo) {
           return Number(rows[0].count);
         },
 
-        async create({ name, description, price, categoryId, image }) {
+        async create({ name, description, price, categoryId, image, promo }) {
           const ownCategoryId = await requireOwnCategory(categoryId);
 
           const [maxRows] = await db.query(
             'SELECT COALESCE(MAX(sort_order), 0) + 1 as next FROM products WHERE category_id = ? AND business_id = ?',
             [ownCategoryId, businessId]
           );
+          const p = camposDePromo(promo);
           const [result] = await db.query(
-            'INSERT INTO products (business_id, category_id, name, description, price, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [businessId, ownCategoryId, name, description || '', price, image || '', maxRows[0].next]
+            `INSERT INTO products
+               (business_id, category_id, name, description, price, image, sort_order,
+                promo_price, promo_label, promo_from, promo_to, promo_days)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              businessId, ownCategoryId, name, description || '', price, image || '', maxRows[0].next,
+              p.promo_price, p.promo_label, p.promo_from, p.promo_to, p.promo_days
+            ]
           );
           return result.insertId;
         },
 
         // `image` opcional: si no viene, la columna no se toca (así guardar sin
         // subir archivo no borra la foto que ya tenía).
-        async update(id, { name, description, price, categoryId, isActive, image }) {
+        async update(id, { name, description, price, categoryId, isActive, image, promo }) {
           const ownCategoryId = await requireOwnCategory(categoryId);
 
           const fields = {
@@ -91,7 +120,10 @@ function productRepository(db, categoryRepo) {
             description: description || '',
             price,
             category_id: ownCategoryId,
-            is_active: isActive ? 1 : 0
+            is_active: isActive ? 1 : 0,
+            // Los campos de promo se escriben SIEMPRE, no sólo si vienen: quitar
+            // una promoción tiene que ser posible, y eso es escribir NULL.
+            ...camposDePromo(promo)
           };
           if (image) fields.image = image;
 
