@@ -24,13 +24,26 @@
             </td>
             <td><strong><%= p.name %></strong><br><span style="font-size:12px;color:#9C9889"><%= p.description || '' %></span></td>
             <td><%= p.category_name %></td>
-            <td style="font-weight:600;color:#C8956C">$ <%= Math.round(p.price).toLocaleString('es-CO') %></td>
+            <td style="font-weight:600;color:#C8956C">
+              <% if (p.promo_price !== null && p.promo_price !== undefined) { %>
+                <span style="text-decoration:line-through;color:#9C9889;font-weight:400">$ <%= Math.round(p.price).toLocaleString('es-CO') %></span><br>
+                $ <%= Math.round(p.promo_price).toLocaleString('es-CO') %>
+                <% var et = etiquetaPromo(p.promoEstado); %>
+                <%# El estado es lo que evita el reclamo "cargué la promo y no se ve":
+                    programada, vencida o fuera de día se dicen, no se adivinan. %>
+                <% if (et) { %>
+                  <br><span style="font-size:10px;font-weight:600;color:<%= et.color %>"><%= et.texto %></span>
+                <% } %>
+              <% } else { %>
+                $ <%= Math.round(p.price).toLocaleString('es-CO') %>
+              <% } %>
+            </td>
             <td>
               <%# `jsonInline` escapa la comilla simple, que es la que delimita este
                   atributo. Con `JSON.stringify` el valor terminaba en el primer
                   apóstrofo del contenido: la descripción de "Cazuela Chidas" dice
                   `pico e' gallo`, y el botón Editar de ese producto no funcionaba. %>
-              <button class="btn btn-secondary btn-sm" onclick='editProd(<%- jsonInline({id:p.id,name:p.name,description:p.description||"",price:p.price,category_id:p.category_id,image:p.image||"",is_active:p.is_active}) %>)'>Editar</button>
+              <button class="btn btn-secondary btn-sm" onclick='editProd(<%- jsonInline({id:p.id,name:p.name,description:p.description||"",price:p.price,category_id:p.category_id,image:p.image||"",is_active:p.is_active,promo_price:p.promo_price,promo_label:p.promo_label||"",promo_from:aFechaTexto(p.promo_from),promo_to:aFechaTexto(p.promo_to),promo_days:p.promo_days||"1111111"}) %>)'>Editar</button>
               <button class="btn btn-danger btn-sm" onclick="deleteProd(<%= p.id %>, '<%= p.name.replace(/'/g,"\\'") %>')">Eliminar</button>
             </td>
           </tr>
@@ -76,6 +89,48 @@
           <label class="toggle"><input type="checkbox" id="prodActive" checked><span class="toggle-slider"></span></label>
         </label>
       </div>
+
+      <%# === Promoción ===
+          El precio promocional es el interruptor: vacío significa sin promoción, y
+          al guardar vacío se limpian también la etiqueta, las fechas y los días.
+          Los demás campos quedan escondidos hasta que haya un precio, para que el
+          formulario no muestre cinco cosas que no hacen nada. %>
+      <fieldset style="border:1px solid #E8E5DE;border-radius:8px;padding:14px;margin-bottom:16px">
+        <legend style="font-size:13px;font-weight:600;color:#6B6860;padding:0 6px">Promoción</legend>
+
+        <div class="form-group">
+          <label>Precio promocional (COP) <span style="font-weight:400;color:#9C9889">— vacío = sin promoción</span></label>
+          <input type="number" id="promoPrice" min="0" placeholder="Sin promoción">
+        </div>
+
+        <div id="promoDetalle" style="display:none">
+          <div class="form-group">
+            <label>Etiqueta <span style="font-weight:400;color:#9C9889">— opcional, ej: 2x1, -30%</span></label>
+            <input type="text" id="promoLabel" maxlength="40" placeholder="">
+          </div>
+
+          <div class="form-group">
+            <label>Vigencia</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+              <button type="button" class="btn btn-secondary btn-sm" data-preset="fija">Fija</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-preset="semana">Esta semana</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-preset="mes">Este mes</button>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:12px;color:#6B6860">Desde <input type="date" id="promoFrom"></label>
+              <label style="font-size:12px;color:#6B6860">Hasta <input type="date" id="promoTo"></label>
+            </div>
+            <p style="font-size:11px;color:#9C9889;margin-top:6px">Sin fechas, la promoción no vence.</p>
+          </div>
+
+          <div class="form-group">
+            <label>Días de la semana</label>
+            <div id="promoDias" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+            <p style="font-size:11px;color:#9C9889;margin-top:6px">Tiene que quedar al menos uno marcado.</p>
+          </div>
+        </div>
+      </fieldset>
+
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" onclick="document.getElementById('prodModal').classList.remove('open')">Cancelar</button>
         <button type="submit" class="btn btn-primary">Guardar</button>
@@ -139,6 +194,95 @@ function saveProdOrder() {
   });
 }
 
+// === Promoción ===
+//
+// El orden de los días es el mismo de toda la app: posición 0 = Domingo, igual
+// que `business_hours.day_index` y que `Date.getDay()`. Cambiarlo acá y no en el
+// resto sería un corrimiento silencioso: la promo del martes se mostraría el
+// lunes.
+var DIAS_PROMO = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+(function construirDias() {
+  var cont = document.getElementById('promoDias');
+  DIAS_PROMO.forEach(function (nombre, i) {
+    var lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;color:#6B6860;cursor:pointer';
+    var chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'promo-dia';
+    chk.dataset.indice = i;
+    chk.checked = true;
+    lbl.appendChild(chk);
+    lbl.appendChild(document.createTextNode(nombre));
+    cont.appendChild(lbl);
+  });
+})();
+
+function diasSeleccionados() {
+  var chks = document.querySelectorAll('.promo-dia');
+  var out = '';
+  for (var i = 0; i < chks.length; i++) out += chks[i].checked ? '1' : '0';
+  return out;
+}
+
+function cargarPromo(p) {
+  document.getElementById('promoPrice').value = (p.promo_price === null || p.promo_price === undefined) ? '' : p.promo_price;
+  document.getElementById('promoLabel').value = p.promo_label || '';
+  document.getElementById('promoFrom').value = p.promo_from || '';
+  document.getElementById('promoTo').value = p.promo_to || '';
+
+  var dias = p.promo_days || '1111111';
+  document.querySelectorAll('.promo-dia').forEach(function (chk, i) {
+    chk.checked = dias[i] === '1';
+  });
+
+  mostrarDetallePromo();
+}
+
+// El detalle sólo aparece cuando hay un precio promocional: sin él, la etiqueta,
+// las fechas y los días no hacen nada, y mostrarlos invita a llenarlos para
+// después descubrir que no se guardó.
+function mostrarDetallePromo() {
+  var hay = document.getElementById('promoPrice').value !== '';
+  document.getElementById('promoDetalle').style.display = hay ? '' : 'none';
+}
+
+document.getElementById('promoPrice').addEventListener('input', mostrarDetallePromo);
+
+// Los atajos de vigencia. Se calculan en el navegador, con la fecha del usuario:
+// es sólo para llenar los dos campos, y lo que decide si la promo está vigente
+// es siempre el servidor, en la zona del negocio.
+document.querySelectorAll('[data-preset]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var desde = document.getElementById('promoFrom');
+    var hasta = document.getElementById('promoTo');
+    var hoy = new Date();
+    var iso = function (d) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    };
+
+    if (this.dataset.preset === 'fija') {
+      desde.value = '';
+      hasta.value = '';
+      return;
+    }
+
+    desde.value = iso(hoy);
+    if (this.dataset.preset === 'semana') {
+      // Hasta el domingo de esta semana. Si hoy ES domingo, la promo dura ese
+      // día: "esta semana" no puede terminar antes de empezar.
+      var faltan = (7 - hoy.getDay()) % 7;
+      var fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + faltan);
+      hasta.value = iso(fin);
+    } else {
+      // Último día de este mes: día 0 del siguiente.
+      hasta.value = iso(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0));
+    }
+  });
+});
+
 function openAddProd() {
   document.getElementById('prodModalTitle').textContent = 'Nuevo producto';
   document.getElementById('prodId').value = '';
@@ -148,6 +292,7 @@ function openAddProd() {
   document.getElementById('prodCat').selectedIndex = 0;
   document.getElementById('prodImgPreview').style.display = 'none';
   document.getElementById('prodActiveGroup').style.display = 'none';
+  cargarPromo({});
   document.getElementById('prodModal').classList.add('open');
 }
 
@@ -166,6 +311,7 @@ function editProd(p) {
   } else {
     document.getElementById('prodImgPreview').style.display = 'none';
   }
+  cargarPromo(p);
   document.getElementById('prodModal').classList.add('open');
 }
 
@@ -180,6 +326,14 @@ document.getElementById('prodForm').addEventListener('submit', async function(e)
   if (id) fd.append('is_active', document.getElementById('prodActive').checked ? '1' : '0');
   var file = document.getElementById('prodImage').files[0];
   if (file) fd.append('image', file);
+
+  // Los cinco campos de promo van SIEMPRE, incluso vacíos: mandar sólo los que
+  // tienen valor haría imposible quitar una promoción desde el formulario.
+  fd.append('promo_price', document.getElementById('promoPrice').value);
+  fd.append('promo_label', document.getElementById('promoLabel').value);
+  fd.append('promo_from', document.getElementById('promoFrom').value);
+  fd.append('promo_to', document.getElementById('promoTo').value);
+  fd.append('promo_days', diasSeleccionados());
 
   var url = id ? '/api/products/' + id : '/api/products';
   var method = id ? 'PUT' : 'POST';

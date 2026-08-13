@@ -14,6 +14,17 @@ const { buildSessionOptions } = require('./session');
 const DEFAULT_DOMAIN = 'enelmapa.co';
 const DEFAULT_PORT = 3000;
 
+// Zona horaria de los negocios, para decidir qué día es "hoy" al evaluar la
+// vigencia de una promoción. El proceso puede correr en UTC —lo normal en un
+// servidor— y ahí "hoy" cambiaría a las 7 de la tarde hora Colombia: una promo
+// que vence el 31 se apagaría el 30 a las 19:00.
+//
+// Es una constante y no una columna porque hoy todos los clientes son
+// colombianos. Cuando eso deje de ser cierto, el cambio es agregar la columna a
+// `businesses` y leerla en lugar de esto — un solo lugar, que es la razón de que
+// esté acá y no repartida por el código.
+const DEFAULT_ZONA_HORARIA = 'America/Bogota';
+
 // Credenciales del superadmin. Los defaults son inseguros a propósito y solo
 // aceptables en local (regla no-negociable #2 del skill); viven acá y no en
 // services/superadminAuth.js para que ese módulo no lea `process.env`.
@@ -57,6 +68,7 @@ function loadConfig(env = process.env) {
     isProduction,
     port: Number(env.PORT) || DEFAULT_PORT,
     domain: env.DOMAIN || DEFAULT_DOMAIN,
+    zonaHoraria: env.TZ_NEGOCIO || DEFAULT_ZONA_HORARIA,
     db: {
       host: env.DB_HOST || 'localhost',
       user: env.DB_USER || 'root',

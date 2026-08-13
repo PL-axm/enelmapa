@@ -83,6 +83,21 @@
     <% }) %>
   </div>
   <style>.scale-option{width:60px;height:60px;border-radius:10px;border:3px solid #E8E5DE;background:#FAFAF7;color:#1A1A18;display:flex;align-items:center;justify-content:center;font-weight:700;margin-bottom:4px;transition:border-color .2s;}</style>
+
+  <%# Apagar la sección no borra nada: los precios promocionales cargados siguen
+      en cada producto y vuelven a mostrarse al encenderla. %>
+  <h3 style="margin-top:28px">Sección de promociones</h3>
+  <p style="font-size:13px;color:#6B6860;margin-bottom:16px">
+    Muestra al principio de tu menú los productos que tengan una promoción vigente.
+    Si la apagás, los precios promocionales que ya cargaste no se pierden.
+  </p>
+  <label style="display:flex;align-items:center;gap:10px;font-size:14px">
+    Mostrar la sección de promociones
+    <label class="toggle">
+      <input type="checkbox" name="promos_enabled" <%= business.promos_enabled ? 'checked' : '' %>>
+      <span class="toggle-slider"></span>
+    </label>
+  </label>
   <script>
     document.querySelectorAll('input[name="menu_scale"]').forEach(function (r) {
       r.addEventListener('change', function () {

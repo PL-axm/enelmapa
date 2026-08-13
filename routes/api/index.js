@@ -34,6 +34,22 @@ function requireAffected(afectó, mensaje) {
   if (!afectó) throw new NotFoundError(mensaje);
 }
 
+// Los cinco campos de promoción viajan juntos y se guardan juntos, así que se
+// agrupan una vez en vez de repetir cinco líneas en crear y otras cinco en
+// editar — que es justo donde una queda afuera y el guardado responde 200 sin
+// guardar ese campo. Ya vienen validados y normalizados por el esquema: el
+// precio es número o null, las fechas son 'YYYY-MM-DD' o null, y los días son
+// siete caracteres.
+function camposPromo(body) {
+  return {
+    promo_price: body.promo_price,
+    promo_label: body.promo_label,
+    promo_from: body.promo_from,
+    promo_to: body.promo_to,
+    promo_days: body.promo_days
+  };
+}
+
 // Sin `pool`: no queda una sola query inline acá. Los handlers son cableado
 // puro — leer la request, llamar al repo, responder. El scope de tenant entra
 // una vez por handler, en `forBusiness(req.session.businessId)`.
@@ -47,7 +63,10 @@ function createApiRouter({ repos, services }) {
     { name: 'banner', maxCount: 1 },
     { name: 'logo', maxCount: 1 }
   ]), verificarImagenes, validate(schemas.settings), asyncHandler(async (req, res) => {
-    const { name, address, phone, whatsapp, instagram, facebook, tiktok, is_open, menu_theme, menu_scale, hours } = req.body;
+    const {
+      name, address, phone, whatsapp, instagram, facebook, tiktok,
+      is_open, menu_theme, menu_scale, promos_enabled, hours
+    } = req.body;
 
     let banner_img, logo_img;
     if (req.files?.banner) banner_img = '/uploads/' + req.session.businessId + '/' + req.files.banner[0].filename;
@@ -63,7 +82,7 @@ function createApiRouter({ repos, services }) {
     // nada. Pasó con `menu_scale` y lo agarró su test de integración.
     await scope.update({
       name, address, phone, whatsapp, instagram, facebook, tiktok,
-      is_open, menu_theme, menu_scale, banner_img, logo_img
+      is_open, menu_theme, menu_scale, promos_enabled, banner_img, logo_img
     });
 
     // Ya viene parseado y validado por el esquema: el try/catch del JSON y el
@@ -122,7 +141,8 @@ function createApiRouter({ repos, services }) {
       description,
       price,
       categoryId: category_id,
-      image: uploadedPath(req)
+      image: uploadedPath(req),
+      promo: camposPromo(req.body)
     });
 
     res.json({ ok: true, id });
@@ -142,7 +162,8 @@ function createApiRouter({ repos, services }) {
       price,
       categoryId: category_id,
       isActive: is_active,
-      image: uploadedPath(req)
+      image: uploadedPath(req),
+      promo: camposPromo(req.body)
     });
 
     requireAffected(afectó, 'Producto no encontrado');
