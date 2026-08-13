@@ -60,19 +60,9 @@
   .search-results { flex: 1; overflow-y: auto; padding: 8px 14px; }
   .search-empty { text-align: center; color: var(--text-muted); padding: 40px 0; font-size: 14px; }
 
-  .menu-content { padding: 0 16px 80px; }
-  .category-section { padding-top: 24px; }
-  .category-title { font-size: 18px; font-weight: 700; color: var(--text-primary); padding-bottom: 14px; margin-bottom: 2px; position: relative; }
-  .category-title::after { content: ''; position: absolute; bottom: 8px; left: 0; width: 32px; height: 2px; background: var(--accent); border-radius: 1px; }
-
-  .product-card { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); cursor: pointer; transition: opacity 0.15s; }
-  .product-card:last-child { border-bottom: none; }
-  .product-card:active { opacity: 0.8; }
-  .product-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
-  .product-name { font-size: 14.5px; font-weight: 600; color: var(--text-primary); line-height: 1.35; }
-  .product-desc { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .product-price { font-size: 14px; font-weight: 700; color: var(--accent); margin-top: 6px; }
-  .product-img { width: 90px; height: 90px; border-radius: var(--radius); object-fit: cover; flex-shrink: 0; background: var(--category-bg); }
+  <%# El CSS de la lista de productos —.menu-content, .category-*, .product-*—
+      vive en el skin (views/menu/), porque es justamente lo que cambia entre
+      uno y otro. Acá queda el chrome, que se comparte. %>
 
   .product-modal { position: fixed; inset: 0; z-index: 200; background: var(--bg); display: none; flex-direction: column; }
   .product-modal.open { display: flex; }
@@ -103,32 +93,30 @@
   .wa-fab:hover { transform: scale(1.08); }
   .wa-fab svg { width: 26px; height: 26px; }
 
+  <%# Los breakpoints están partidos igual que el resto: acá los del chrome, en
+      el skin los de las tarjetas. Cada mitad conserva su orden base → media, que
+      es lo que decide la cascada. %>
   @media (max-width: 600px) {
     .wrapper { max-width: 100%; }
     .header-banner { height: 180px; }
     .header-info h1 { font-size: 20px; }
-    .menu-content { padding: 0 14px 100px; }
-    .product-card { gap: 12px; padding: 12px 0; }
-    .product-name { font-size: 14px; }
-    .product-desc { font-size: 12px; }
-    .product-price { font-size: 13.5px; }
-    .product-img { width: 85px; height: 85px; border-radius: 8px; }
     .cat-nav-inner { padding: 0 8px; }
     .cat-nav-btn { padding: 11px 12px; font-size: 12.5px; }
   }
   @media (max-width: 380px) {
     .header-info h1 { font-size: 18px; }
     .header-banner { height: 160px; }
-    .product-img { width: 75px; height: 75px; }
-    .product-name { font-size: 13.5px; }
-    .menu-content { padding: 0 12px 100px; }
   }
   @media (min-width: 901px) {
     .wrapper { box-shadow: var(--shadow-lg); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
-    .product-img { width: 100px; height: 100px; }
-    .product-card:hover { background: var(--category-bg); margin: 0 -16px; padding-left: 16px; padding-right: 16px; border-radius: var(--radius); }
   }
 </style>
+<%# El skin: su CSS y su `window.SKIN`. Va en el `<head>` para que sus estilos
+    lleguen antes del primer pintado y para que `SKIN` ya exista cuando el script
+    del final del body lo use. `plantilla` la resuelve el router contra el
+    registro de theme/templates.js, así que un valor raro guardado en la base no
+    puede convertirse en un include arbitrario. %>
+<%- include('menu/' + plantilla) %>
 </head>
 <body>
 <div class="wrapper">
@@ -312,14 +300,13 @@ document.getElementById('searchInput').addEventListener('input', function() {
     cat.products.forEach(p => {
       if (p.name.toLowerCase().includes(q) || (p.desc && p.desc.toLowerCase().includes(q))) {
         found++;
-        const card = document.createElement('div');
-        card.className = 'product-card';
+        // La MISMA tarjeta que en el menú. Antes esto se armaba acá con
+        // `innerHTML` concatenando `p.name` y `p.desc`, o sea inyección con el
+        // dato del negocio, mientras el render del menú —dos funciones más
+        // abajo— usaba `textContent` y estaba bien. Dos copias de la misma
+        // tarjeta con distinto criterio de seguridad.
+        const card = SKIN.tarjetaProducto(p, { formatPrice });
         card.addEventListener('click', () => { document.getElementById('searchOverlay').classList.remove('open'); openProductModal(p); });
-        const info = document.createElement('div');
-        info.className = 'product-info';
-        info.innerHTML = '<div class="product-name">' + p.name + '</div>' + (p.desc ? '<div class="product-desc">' + p.desc + '</div>' : '') + '<div class="product-price">' + formatPrice(p.price) + '</div>';
-        card.appendChild(info);
-        if (p.img) { const img = document.createElement('img'); img.className = 'product-img'; img.src = p.img; img.loading = 'lazy'; card.appendChild(img); }
         results.appendChild(card);
       }
     });
@@ -336,19 +323,16 @@ menuData.forEach((cat, ci) => {
   title.className = 'category-title';
   title.textContent = cat.name;
   section.appendChild(title);
+  // El contenedor lo decide el skin: `clasico` devuelve un fragmento, así que
+  // las tarjetas quedan como hijas directas de la sección —el DOM que este menú
+  // ya tenía—, y el de grilla va a devolver un elemento con `display: grid`.
+  const contenedor = SKIN.contenedorProductos();
   cat.products.forEach(p => {
-    const card = document.createElement('div');
-    card.className = 'product-card';
+    const card = SKIN.tarjetaProducto(p, { formatPrice });
     card.addEventListener('click', () => openProductModal(p));
-    const info = document.createElement('div');
-    info.className = 'product-info';
-    const name = document.createElement('div'); name.className = 'product-name'; name.textContent = p.name; info.appendChild(name);
-    if (p.desc) { const desc = document.createElement('div'); desc.className = 'product-desc'; desc.textContent = p.desc; info.appendChild(desc); }
-    const price = document.createElement('div'); price.className = 'product-price'; price.textContent = formatPrice(p.price); info.appendChild(price);
-    card.appendChild(info);
-    if (p.img) { const img = document.createElement('img'); img.className = 'product-img'; img.src = p.img; img.alt = p.name; img.loading = 'lazy'; card.appendChild(img); }
-    section.appendChild(card);
+    contenedor.appendChild(card);
   });
+  section.appendChild(contenedor);
   content.appendChild(section);
 });
 
