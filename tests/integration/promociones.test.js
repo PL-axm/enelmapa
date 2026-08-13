@@ -334,20 +334,138 @@ describe('promociones', () => {
     });
   });
 
-  test('el menú público NO cambia todavía', async () => {
-    // Esta fase es sólo backend y panel: la sección del menú es la siguiente. Si
-    // algo de acá se filtrara al menú, se rompería el corte entre las dos fases.
-    await agent.post('/api/products').type('form')
-      .send({ ...productoBase(), promo_price: '15000', promo_label: 'ROMPER' });
+});
 
-    await getTestPool().query(
-      'UPDATE businesses SET promos_enabled = 1 WHERE id = ?', [business.businessId]
-    );
+// === Fase 5: la sección en el menú público ===
+describe('la sección de promociones en el menú', () => {
+  let business;
+  let agent;
 
-    const res = await request(app).get('/s/test-promos');
+  const hoyTexto = () => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
 
+  beforeEach(async () => {
+    await resetDb();
+    business = await createBusiness({
+      slug: 'test-seccion',
+      name: 'Test Sección',
+      adminEmail: 'seccion@test.local',
+      adminPassword: 'password-seccion-123'
+    });
+    agent = await loginAdmin(app, {
+      email: business.adminEmail,
+      password: business.adminPassword
+    });
+  });
+
+  async function crearConPromo(extra = {}) {
+    const res = await agent.post('/api/products').type('form').send({
+      name: 'Producto en promo',
+      description: 'x',
+      price: '20000',
+      category_id: String(business.categoryId),
+      promo_price: '15000',
+      ...extra
+    });
     expect(res.status).toBe(200);
-    expect(res.text).not.toContain('ROMPER');
-    expect(res.text).not.toContain('Promociones');
+    return res.body.id;
+  }
+
+  const encender = () => getTestPool().query(
+    'UPDATE businesses SET promos_enabled = 1 WHERE id = ?', [business.businessId]
+  );
+
+  function datosDelMenu(texto) {
+    return JSON.parse(texto.match(/const menuData = (.+);/)[1]);
+  }
+
+  test('encendida y con promo vigente, la sección va primera', async () => {
+    await crearConPromo();
+    await encender();
+
+    const res = await request(app).get('/s/test-seccion');
+    const data = datosDelMenu(res.text);
+
+    expect(data.promos).not.toBeNull();
+    expect(data.promos.name).toBe('Promociones');
+    expect(data.promos.products).toHaveLength(1);
+  });
+
+  test('el producto en promo también sigue en su categoría', async () => {
+    await crearConPromo();
+    await encender();
+
+    const data = datosDelMenu((await request(app).get('/s/test-seccion')).text);
+    const idsEnCategorias = data.categorias.flatMap(c => c.products.map(p => p.id));
+
+    expect(idsEnCategorias).toContain(data.promos.products[0].id);
+  });
+
+  test('apagada, el menú queda exactamente como sin promociones', async () => {
+    await crearConPromo({ promo_label: 'NO SALE' });
+    // sin encender
+
+    const res = await request(app).get('/s/test-seccion');
+    const data = datosDelMenu(res.text);
+
+    expect(data.promos).toBeNull();
+    expect(res.text).not.toContain('NO SALE');
+    // Y la tarjeta tampoco anuncia la promo: el interruptor apaga la promoción
+    // entera, no sólo la sección.
+    expect(data.categorias[0].products.every(p => p.promo === null)).toBe(true);
+  });
+
+  test('encendida y sin promos vigentes no aparece una sección vacía', async () => {
+    await agent.post('/api/products').type('form').send({
+      name: 'Sin promo', description: '', price: '20000',
+      category_id: String(business.categoryId)
+    });
+    await encender();
+
+    const data = datosDelMenu((await request(app).get('/s/test-seccion')).text);
+    expect(data.promos).toBeNull();
+  });
+
+  test('una promo vencida no llega al menú', async () => {
+    await crearConPromo({ promo_to: '2020-01-01' });
+    await encender();
+
+    const data = datosDelMenu((await request(app).get('/s/test-seccion')).text);
+    expect(data.promos).toBeNull();
+  });
+
+  test('una promo que empieza hoy sí llega', async () => {
+    // El borde inclusivo, contra la base de verdad y no sólo en el unit test.
+    await crearConPromo({ promo_from: hoyTexto(), promo_to: hoyTexto() });
+    await encender();
+
+    const data = datosDelMenu((await request(app).get('/s/test-seccion')).text);
+    expect(data.promos).not.toBeNull();
+  });
+
+  test('el precio normal viaja junto al promocional, para tacharlo', async () => {
+    await crearConPromo({ promo_label: '-25%' });
+    await encender();
+
+    const data = datosDelMenu((await request(app).get('/s/test-seccion')).text);
+    const p = data.promos.products[0];
+
+    expect(Number(p.price)).toBe(20000);
+    expect(Number(p.promo.price)).toBe(15000);
+    expect(p.promo.label).toBe('-25%');
+  });
+
+  test('una etiqueta con HTML no puede inyectar', async () => {
+    // La etiqueta la escribe el dueño del negocio y se muestra a cualquiera que
+    // abra el menú, igual que el nombre.
+    await crearConPromo({ promo_label: '</script><img src=x>' });
+    await encender();
+
+    const res = await request(app).get('/s/test-seccion');
+
+    expect(res.text).not.toContain('</script><img');
+    expect(res.text).toContain('\\u003c/script\\u003e');
   });
 });

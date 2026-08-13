@@ -367,7 +367,7 @@ dos.
   mensaje claro; `'0000000'` en días se rechaza; guardar sin promo limpia fechas
   y días; el menú público queda **exactamente** como antes.
 
-### Fase 5 — La sección de promociones en el menú
+### Fase 5 — La sección de promociones en el menú ✅
 
 - `menuService.buildMenu` devuelve `{ promos, categorias }` en vez de un array.
   Es un cambio de contrato: alcanza a `routes/public.js`, al armazón y a

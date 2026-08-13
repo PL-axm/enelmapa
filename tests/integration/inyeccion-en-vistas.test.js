@@ -79,7 +79,7 @@ describe('inyección a través de datos del negocio', () => {
       const json = res.text.match(/const menuData = (.+);/)[1];
       const data = JSON.parse(json);
 
-      const productos = data.flatMap(c => c.products);
+      const productos = data.categorias.flatMap(c => c.products);
       const elNuestro = productos.find(p => p.name === PAYLOAD_SCRIPT);
 
       expect(elNuestro).toBeDefined();
