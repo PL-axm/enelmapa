@@ -1,4 +1,5 @@
 const { schemas, SLUGS_RESERVADOS } = require('../../validators');
+const tema = require('../../theme');
 
 // Los esquemas son puros: se prueban sin DB ni HTTP. Lo que se fija acá es el
 // contrato del borde — qué entra, qué se rechaza, y con qué tipo sale.
@@ -190,9 +191,17 @@ describe('validators', () => {
   });
 
   describe('tema del menú', () => {
-    test('acepta los temas que ofrece la vista', () => {
-      for (const t of ['light', 'dark', 'cream', 'green', 'blue']) {
-        expect(ok(schemas.settings, { name: 'N', menu_theme: t }).menu_theme).toBe(t);
+    // Este test decía "acepta los temas que ofrece la vista" y recorría una
+    // lista escrita a mano que incluía `blue` — un tema que la vista NO ofrecía
+    // y que no tenía CSS. O sea que afirmaba lo contrario de su propio nombre y
+    // dejaba pasar el bug en verde. Ahora la lista sale de `theme/`, la misma
+    // fuente que usan el validador y el panel.
+    //
+    // La coherencia entre las tres puntas se verifica en tests/unit/theme.test.js;
+    // acá quedan las reglas propias del schema.
+    test('acepta las paletas declaradas en theme/', () => {
+      for (const id of tema.idsDePaletas()) {
+        expect(ok(schemas.settings, { name: 'N', menu_theme: id }).menu_theme).toBe(id);
       }
     });
 
@@ -200,8 +209,8 @@ describe('validators', () => {
       expect(schemas.settings.safeParse({ name: 'N', menu_theme: 'fucsia' }).success).toBe(false);
     });
 
-    test('sin tema cae a light', () => {
-      expect(ok(schemas.settings, { name: 'N' }).menu_theme).toBe('light');
+    test('sin tema cae al de por defecto', () => {
+      expect(ok(schemas.settings, { name: 'N' }).menu_theme).toBe(tema.PALETA_POR_DEFECTO);
     });
   });
 });

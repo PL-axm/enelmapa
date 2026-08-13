@@ -3,6 +3,8 @@ const authRequired = require('../middleware/auth');
 const asyncHandler = require('../middleware/asyncHandler');
 const { createLoginLimiter } = require('../middleware/rateLimit');
 const { regenerarSesion, destruirSesion } = require('../middleware/sesion');
+const jsonInline = require('../services/jsonInline');
+const tema = require('../theme');
 
 // Cada handler es leer la sesión, llamar a un repo o servicio, y renderizar.
 // Ni SQL ni bcrypt ni generación de QR: eso vive en repositories/ y services/.
@@ -63,7 +65,15 @@ function createAdminRouter({ repos, services, config }) {
     const business = await scope.get();
     const hours = await scope.hours();
 
-    res.render('admin/settings', { session: req.session, business, hours });
+    res.render('admin/settings', {
+      session: req.session,
+      business,
+      hours,
+      // Las opciones de paleta salen de theme/, la misma fuente que valida el
+      // POST. Escritas en la vista se desincronizaban.
+      paletas: tema.paletasParaUI(),
+      paletaPorDefecto: tema.PALETA_POR_DEFECTO
+    });
   }));
 
   router.get('/categories', authRequired, asyncHandler(async (req, res) => {
@@ -79,7 +89,7 @@ function createAdminRouter({ repos, services, config }) {
     const categories = await repos.categories.forBusiness(scope).listOrdered();
     const products = await repos.products.forBusiness(scope).listWithCategory();
 
-    res.render('admin/products', { session: req.session, categories, products });
+    res.render('admin/products', { session: req.session, categories, products, jsonInline });
   }));
 
   router.get('/qr', authRequired, asyncHandler(async (req, res) => {
