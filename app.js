@@ -52,7 +52,7 @@ function createApp({ repos, services, config, sessionStore, logger }) {
   app.use(csrf.createProtect({ exentas: ['/admin/login', '/superadmin/login'] }));
 
   const tenantMiddleware = createTenantMiddleware({ repos });
-  const publicRoutes = createPublicRouter({ services });
+  const publicRoutes = createPublicRouter({ services, config });
 
   app.use((req, res, next) => {
     const subdomain = getSubdomain(req.hostname);

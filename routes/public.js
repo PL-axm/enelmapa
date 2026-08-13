@@ -1,18 +1,29 @@
 const express = require('express');
 const jsonInline = require('../services/jsonInline');
 const { cssDePaleta, cssDeEscala, plantillaOPorDefecto } = require('../theme');
+const promos = require('../services/promos');
 
 // Este router no sabe qué tenant está renderizando: sólo pasa lo que
 // `middleware/tenant.js` dejó en req por `menuService` y renderiza. El armado
 // de `menuData` —y la regla de esconder las categorías vacías— vive en el
 // servicio, donde se puede probar sin levantar Express.
-function createPublicRouter({ services }) {
+function createPublicRouter({ services, config }) {
   const router = express.Router();
 
   router.get('*', (req, res) => {
     const { business, businessHours, categories, products } = req;
 
-    const menuData = services.menu.buildMenu({ categories, products });
+    // La fecha se calcula acá y se inyecta: el servicio es puro y no lee el
+    // reloj. `config.zonaHoraria` es la del negocio, no la del servidor — si el
+    // proceso corre en UTC, "hoy" cambiaría a las 7 de la tarde hora Colombia.
+    const hoy = promos.hoyEn(config.zonaHoraria);
+
+    const menuData = services.menu.buildMenu({
+      categories,
+      products,
+      promosEnabled: Boolean(business.promos_enabled),
+      hoy
+    });
 
     res.render('menu', {
       business,

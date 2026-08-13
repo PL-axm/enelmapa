@@ -248,6 +248,15 @@
     services/jsonInline.js. %>
 const menuData = <%- jsonInline(menuData) %>;
 
+// `buildMenu` devuelve `{ promos, categorias }`. La sección de promociones va
+// PRIMERA cuando viene, y viene sólo si el negocio la tiene encendida y hay al
+// menos una promo vigente hoy — esa decisión es del servicio, acá no se
+// re-evalúa. Desde este punto todo el resto del script trata a `secciones` como
+// lo que era antes: una lista de categorías con productos.
+const secciones = menuData.promos
+  ? [menuData.promos].concat(menuData.categorias)
+  : menuData.categorias;
+
 function formatPrice(p) { return '$ ' + Math.round(p).toLocaleString('es-CO'); }
 
 function scrollToCategory(i) {
@@ -264,15 +273,36 @@ function openProductModal(p) {
   document.getElementById('pmImg').style.display = p.img ? '' : 'none';
   document.getElementById('pmName').textContent = p.name;
   document.getElementById('pmDesc').textContent = p.desc || '';
-  document.getElementById('pmPrice').textContent = formatPrice(p.price);
-  document.getElementById('pmFooter').textContent = 'Precio: ' + formatPrice(p.price);
+  // Si el producto está en promoción, el modal muestra lo mismo que la tarjeta.
+  // Mostrar el precio de lista acá, después de que la tarjeta anunciara la
+  // promo, se leería como un engaño.
+  const pmPrice = document.getElementById('pmPrice');
+  pmPrice.textContent = '';
+  if (p.promo) {
+    const viejo = document.createElement('span');
+    viejo.className = 'product-price-old';
+    viejo.textContent = formatPrice(p.price);
+    pmPrice.appendChild(viejo);
+    pmPrice.appendChild(document.createTextNode(formatPrice(p.promo.price)));
+    if (p.promo.label) {
+      const badge = document.createElement('span');
+      badge.className = 'promo-badge';
+      badge.textContent = p.promo.label;
+      pmPrice.appendChild(badge);
+    }
+  } else {
+    pmPrice.textContent = formatPrice(p.price);
+  }
+
+  document.getElementById('pmFooter').textContent =
+    'Precio: ' + formatPrice(p.promo ? p.promo.price : p.price);
   document.getElementById('productModal').classList.add('open');
 }
 
 const navInner = document.getElementById('catNavInner');
 const dropdownPanel = document.getElementById('catDropdownPanel');
 
-menuData.forEach((cat, i) => {
+secciones.forEach((cat, i) => {
   const btn = document.createElement('button');
   btn.className = 'cat-nav-btn' + (i === 0 ? ' active' : '');
   btn.textContent = cat.name;
@@ -307,7 +337,7 @@ document.getElementById('searchInput').addEventListener('input', function() {
   results.innerHTML = '';
   if (!q) return;
   let found = 0;
-  menuData.forEach(cat => {
+  secciones.forEach(cat => {
     cat.products.forEach(p => {
       if (p.name.toLowerCase().includes(q) || (p.desc && p.desc.toLowerCase().includes(q))) {
         found++;
@@ -326,7 +356,7 @@ document.getElementById('searchInput').addEventListener('input', function() {
 });
 
 const content = document.getElementById('menuContent');
-menuData.forEach((cat, ci) => {
+secciones.forEach((cat, ci) => {
   const section = document.createElement('div');
   section.className = 'category-section';
   section.id = 'cat-' + ci;
