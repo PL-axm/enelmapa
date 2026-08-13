@@ -14,14 +14,14 @@ antes de mergear — reemplaza a un pipeline automático que no existe.
       los tests automáticos cubren el caso genérico, este paso cubre lo que
       los fixtures no pensaron.
 - [ ] Reiniciar `npm run dev` en frío una vez (no hot-reload) y probar el
-      flujo tocado — detecta fallos de `initDb()` o de sesión que solo
-      aparecen en boot limpio (relevante por MemoryStore + reciclado de
-      procesos en Passenger, ver regla no-negociable #4 de
-      `.claude/skills/enelmapa-dev/SKILL.md`).
+      flujo tocado — detecta lo que sólo aparece en boot limpio: una migración
+      pendiente que falla, el fail-fast de `SESSION_SECRET`, un servicio que el
+      container no cablea. Passenger recicla procesos, así que en producción
+      todo arranque es en frío.
 - [ ] Revisar la consola del server durante la prueba manual por errores no
-      atrapados / requests colgadas (no hay error-handler centralizado
-      todavía, `BEST_PRACTICES.md` sección 4 — la terminal es la única red
-      de seguridad hoy).
+      atrapados / requests colgadas. Hay error-handler centralizado y logger con
+      niveles, así que lo que se busca acá es distinto: `ERROR` inesperado,
+      stack traces, o un `WARN` que no corresponda a lo que se estaba probando.
 - [ ] Si el cambio agrega/modifica columnas o tablas: correr `npm run dev`
       dos veces seguidas contra una `enelmapa_dev` con datos, confirmar que
       `initDb()` sigue siendo idempotente y no rompe en el segundo boot.
