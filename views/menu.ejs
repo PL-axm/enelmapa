@@ -38,10 +38,37 @@
   .info-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 16px; padding: 10px 16px; background: none; border: 1px solid var(--border); border-radius: var(--radius); font-family: inherit; font-size: 14px; font-weight: 500; color: var(--text-primary); cursor: pointer; transition: background 0.2s; }
   .info-btn:hover { background: var(--category-bg); }
 
-  <%# `width: 100%` + `height: auto` y nada de recorte: la lámina la diseñó el
-      negocio y cortarla por un alto fijo taparía justo lo que quiso decir. La
-      página se estira según la proporción de la imagen. %>
-  .promo-flyer { display: block; width: 100%; height: auto; }
+  <%# El flyer, como aviso encima del menú.
+
+      `z-index: 250` lo pone arriba de todo lo demás —los modales están en 200, el
+      buscador y el FAB entre 150 y 160—. No compite con nada porque es lo primero
+      que se ve y lo primero que se descarta: cuando el visitante abre un producto,
+      el aviso ya se cerró.
+
+      Nace oculto y lo abre el script. Si apareciera con la página y el script
+      decidiera después, el que ya lo cerró en esta visita vería un parpadeo del
+      aviso en cada carga. %>
+  .flyer-popup { position: fixed; inset: 0; z-index: 250; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .flyer-popup.open { display: flex; }
+  .flyer-popup-fondo { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
+  <%# La caja NO scrollea: se ajusta a la imagen, y la imagen se ajusta a la
+      pantalla. Con `overflow: auto` una lámina alta —las que salen de una historia
+      de Instagram— se podía recorrer, pero la X va posicionada dentro de la caja y
+      se iba de vista al bajar: el aviso quedaba sin salida visible. Limitando la
+      imagen por alto además se ve completa de una, que es lo que el negocio quiere
+      de un flyer. %>
+  .flyer-popup-caja { position: relative; max-width: 480px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-lg); background: var(--bg-card); line-height: 0; }
+  <%# La X va sobre la imagen, en un círculo propio con fondo oscuro: encima de una
+      lámina de color cualquiera, un ícono suelto puede volverse invisible. %>
+  .flyer-popup-cerrar { position: absolute; top: 10px; right: 10px; z-index: 2; width: 34px; height: 34px; border: none; border-radius: 50%; background: rgba(0,0,0,0.55); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .flyer-popup-cerrar:hover { background: rgba(0,0,0,0.75); }
+
+  <%# La imagen se limita por ancho Y por alto, y con `width/height: auto` elige
+      ella cuál manda: una lámina ancha se frena en los 480px de la caja, una alta
+      se frena en el 85vh y la caja se angosta con ella. Sin recorte —la lámina la
+      diseñó el negocio y cortarla taparía justo lo que quiso decir— y sin bandas
+      de relleno alrededor. %>
+  .promo-flyer { display: block; max-width: 100%; max-height: 85vh; width: auto; height: auto; }
 
   <%# Los precios de promoción viven ACÁ y no en el skin, aunque los dibuje la
       tarjeta: el modal de producto —que es del armazón— usa las mismas clases.
@@ -171,19 +198,6 @@
     </button>
   </div>
 
-  <%# El flyer va acá: después del encabezado y ANTES de la nav, que es sticky.
-      Al revés la nav se pegaría arriba y el flyer scrollearía por debajo de ella.
-
-      Se muestra sólo con las promociones encendidas, porque es una promoción: el
-      mismo interruptor que la sección. Y no es un enlace ni abre nada — informa
-      y se termina ahí, así no hay nada que pueda quedar roto.
-
-      Vive en el armazón y no en el skin porque está fuera de la lista de
-      productos: es chrome, y lo comparten todos los skins. %>
-  <% if (business.promos_enabled && business.promo_flyer) { %>
-    <img class="promo-flyer" src="<%= business.promo_flyer %>" alt="Promociones de <%= business.name %>">
-  <% } %>
-
   <nav class="cat-nav" id="catNav">
     <div class="cat-nav-actions">
       <button class="cat-nav-action" id="searchBtn" title="Buscar">
@@ -272,6 +286,67 @@
 <a class="wa-fab" href="https://api.whatsapp.com/send?phone=<%= business.whatsapp %>&text=👋 Hola, vengo del menú digital" target="_blank">
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 </a>
+<% } %>
+
+<%# El flyer de promociones, como aviso encima del menú. Sólo con las promociones
+    encendidas, porque es una promoción: el mismo interruptor que la sección. %>
+<% if (business.promos_enabled && business.promo_flyer) { %>
+  <div class="flyer-popup" id="flyerPopup" data-flyer="<%= business.promo_flyer %>">
+    <div class="flyer-popup-fondo" data-cerrar-flyer></div>
+    <div class="flyer-popup-caja">
+      <button class="flyer-popup-cerrar" type="button" data-cerrar-flyer aria-label="Cerrar aviso">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <img class="promo-flyer" src="<%= business.promo_flyer %>" alt="Promociones de <%= business.name %>">
+    </div>
+  </div>
+
+  <%# Este script va ACÁ y no en el de abajo a propósito: el aviso tiene que ser
+      lo primero que se abre. El script grande arma el menú entero —hasta 114
+      tarjetas— antes de llegar al final, así que abrir el aviso desde ahí lo
+      dejaría apareciendo después del menú. Acá corre en cuanto el navegador
+      encuentra el `<div>`, o sea antes de que exista una sola tarjeta.
+
+      No se espera a que la imagen cargue: esperarla sería, otra vez, no ser lo
+      primero. Se abre y la lámina entra cuando llega. %>
+  <script>
+    (function () {
+      var popup = document.getElementById('flyerPopup');
+
+      // La clave incluye la URL de la imagen, así que si el negocio CAMBIA el
+      // flyer, quien ya había cerrado el anterior ve el nuevo. Con una clave fija
+      // —un simple "flyer-visto"— el que cerró un aviso una vez no volvería a ver
+      // ninguna promoción nunca más en esa pestaña.
+      var clave = 'flyer:' + popup.dataset.flyer;
+
+      // sessionStorage y no localStorage: se muestra una vez por visita, no una
+      // vez en la vida. Y en un try/catch porque en modo privado de algunos
+      // navegadores el simple acceso lanza — sin esto, una excepción acá cortaría
+      // el script y el menú quedaría sin promociones ni aviso.
+      var yaVisto = false;
+      try { yaVisto = sessionStorage.getItem(clave) === '1'; } catch (e) {}
+
+      if (yaVisto) return;
+      popup.classList.add('open');
+
+      function cerrar() {
+        popup.classList.remove('open');
+        try { sessionStorage.setItem(clave, '1'); } catch (e) {}
+        document.removeEventListener('keydown', alEscape);
+      }
+
+      function alEscape(e) {
+        if (e.key === 'Escape') cerrar();
+      }
+
+      // Tres caminos para salir: la X, el fondo y Escape. Un aviso del que no se
+      // sale fácil es peor que no tenerlo.
+      popup.querySelectorAll('[data-cerrar-flyer]').forEach(function (el) {
+        el.addEventListener('click', cerrar);
+      });
+      document.addEventListener('keydown', alEscape);
+    })();
+  </script>
 <% } %>
 
 <script>

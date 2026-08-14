@@ -443,6 +443,36 @@ con imagen cargada; se puede quitar; sin flyer el menú queda igual que antes; l
 sección se llama PROMOCIONES en el título, en el chip de la nav y en el
 desplegable.
 
+### Fase 8 — El flyer pasa a popup ✅
+
+Pedido el 2026-08-14. El flyer se mostraba como banner entre el encabezado y la
+nav; ahora es un aviso que aparece encima del menú al abrirlo.
+
+- **Reemplaza al banner, no se suma.** "Que sea un popup" es eso: si quedaran los
+  dos, el negocio tendría la misma imagen dos veces en la misma pantalla.
+- **Se muestra una vez por visita**, no en cada carga. La clave de
+  `sessionStorage` incluye la URL de la imagen, así que **si el negocio cambia el
+  flyer, el visitante que ya lo cerró vuelve a ver el nuevo**. Sin eso, quien
+  cierra el aviso una vez no vuelve a ver ninguna promoción nunca más en esa
+  pestaña.
+- **Se cierra con la X, con el fondo y con Escape.** Un popup del que no se sale
+  fácil es peor que no tenerlo.
+- `z-index: 250`, arriba de todo lo demás (los modales están en 200, el FAB y el
+  buscador en 150-160). Es lo primero que se ve y lo primero que se descarta, así
+  que no compite con nada: cuando el visitante abre un producto, el aviso ya no
+  está.
+- El interruptor sigue siendo el mismo, `promos_enabled`.
+
+**Costo aceptado, que conviene tener escrito**: un banner se podía volver a mirar
+scrolleando; un popup cerrado desaparece por esa visita. Se gana atención, se
+pierde permanencia. Si más adelante molesta, dejar el banner *además* del popup
+es una línea.
+
+**Criterio de aceptación**: aparece al abrir el menú con promociones encendidas y
+flyer cargado; se cierra por los tres caminos; no vuelve a aparecer al recargar
+en la misma pestaña; sí vuelve si el flyer cambia; sin flyer o con promociones
+apagadas no hay ni rastro de él.
+
 ### Fase 7 — Skin `grilla` ✅
 
 - `views/menu/grilla.ejs`: grilla de 2 columnas, foto arriba, nombre, descripción

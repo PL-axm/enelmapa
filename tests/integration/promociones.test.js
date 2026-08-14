@@ -528,8 +528,65 @@ describe('flyer de promociones', () => {
     const res = await request(app).get('/s/test-flyer');
     const flyer = (await leerNegocio()).promo_flyer;
 
+    expect(res.text).toContain('id="flyerPopup"');
     expect(res.text).toContain('class="promo-flyer"');
     expect(res.text).toContain(flyer);
+  });
+
+  // El aviso tiene que ser lo PRIMERO que se abre, así que su script va antes del
+  // que arma el menú. Desde el script grande aparecería recién después de dibujar
+  // hasta 114 tarjetas.
+  test('su script va antes del que arma el menú', async () => {
+    await subirFlyer();
+
+    const res = await request(app).get('/s/test-flyer');
+
+    expect(res.text.indexOf('flyerPopup')).toBeLessThan(res.text.indexOf('const menuData ='));
+  });
+
+  test('nace oculto: lo abre el script, no el CSS', async () => {
+    // Si apareciera con la página y el script decidiera después, quien ya lo cerró
+    // en esta visita vería un parpadeo del aviso en cada carga.
+    await subirFlyer();
+
+    const res = await request(app).get('/s/test-flyer');
+
+    expect(res.text).toMatch(/\.flyer-popup \{[^}]*display: none/);
+    expect(res.text).toMatch(/\.flyer-popup\.open \{[^}]*display: flex/);
+    expect(res.text).not.toMatch(/id="flyerPopup"[^>]*class="[^"]*open/);
+  });
+
+  test('se puede cerrar por la X, por el fondo y por Escape', async () => {
+    await subirFlyer();
+
+    const res = await request(app).get('/s/test-flyer');
+
+    // Dos elementos marcados para cerrar —la X y el fondo— más el manejo de la
+    // tecla. Un aviso del que no se sale fácil es peor que no tenerlo.
+    expect((res.text.match(/data-cerrar-flyer/g) || []).length).toBeGreaterThanOrEqual(2);
+    expect(res.text).toContain("e.key === 'Escape'");
+  });
+
+  test('la clave de "ya lo vio" incluye la imagen, así un flyer nuevo se vuelve a mostrar', async () => {
+    // Con una clave fija, quien cierra un aviso una vez no volvería a ver ninguna
+    // promoción nunca más en esa pestaña.
+    await subirFlyer();
+
+    const res = await request(app).get('/s/test-flyer');
+
+    expect(res.text).toContain("'flyer:' + popup.dataset.flyer");
+    expect(res.text).toContain('sessionStorage');
+  });
+
+  test('ya NO se muestra como banner suelto arriba del menú', async () => {
+    // Si quedaran los dos, el negocio tendría la misma imagen dos veces en la
+    // misma pantalla.
+    await subirFlyer();
+
+    const res = await request(app).get('/s/test-flyer');
+    const antesDeLaNav = res.text.slice(0, res.text.indexOf('<nav class="cat-nav"'));
+
+    expect(antesDeLaNav).not.toContain('promo-flyer"');
   });
 
   // Es una promoción, así que la apaga el mismo interruptor que la sección.
@@ -541,6 +598,7 @@ describe('flyer de promociones', () => {
 
     const res = await request(app).get('/s/test-flyer');
 
+    expect(res.text).not.toContain('id="flyerPopup"');
     expect(res.text).not.toContain('class="promo-flyer"');
     // Y no se borró: vuelve al encenderlo.
     expect((await leerNegocio()).promo_flyer).not.toBe('');
@@ -551,7 +609,7 @@ describe('flyer de promociones', () => {
       .send({ name: business.name, promos_enabled: 'on' });
 
     const res = await request(app).get('/s/test-flyer');
-    expect(res.text).not.toContain('class="promo-flyer"');
+    expect(res.text).not.toContain('id="flyerPopup"');
   });
 
   // Lo que banner y logo NO pueden hacer, y para un flyer es indispensable: la

@@ -151,14 +151,14 @@
   </label>
 
   <%# El flyer: una imagen sola, para el negocio que prefiere anunciar con su
-      propia lámina en vez de con precios tachados. Va arriba del menú y sólo se
-      ve con las promociones encendidas, porque es una promoción.
+      propia lámina en vez de con precios tachados. Aparece como aviso al abrir el
+      menú y sólo con las promociones encendidas, porque es una promoción.
 
       La casilla de quitar existe porque el flyer TIENE que poder bajarse: la
       promoción termina. Banner y logo sólo se pueden reemplazar, y para ellos
       alcanza; para esto no. %>
   <div class="form-group" style="margin-top:20px">
-    <label>Flyer de promociones <span style="font-weight:400;color:#9C9889">— opcional, se muestra arriba de tu menú</span></label>
+    <label>Flyer de promociones <span style="font-weight:400;color:#9C9889">— opcional, aparece como aviso al abrir tu menú</span></label>
     <input type="file" name="flyer" id="flyerInput" accept="image/*">
     <% if (business.promo_flyer) { %>
       <img src="<%= business.promo_flyer %>" alt="Flyer actual" style="display:block;max-width:100%;margin-top:10px;border-radius:8px;border:1px solid #E8E5DE">
@@ -172,6 +172,12 @@
       </label>
     <% } else { %>
       <p style="font-size:12px;color:#9C9889;margin-top:6px">Todavía no cargaste ningún flyer.</p>
+    <% } %>
+    <% if (business.promo_flyer) { %>
+      <p style="font-size:11px;color:#9C9889;margin-top:8px">
+        Se le muestra una vez por visita a cada cliente. Si lo cambiás por otro, quien ya
+        había visto el anterior verá el nuevo.
+      </p>
     <% } %>
   </div>
   <script>
