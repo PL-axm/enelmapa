@@ -3,6 +3,7 @@ const { createTestApp, getTestPool } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createBusiness } = require('../helpers/fixtures');
 const { loginAdmin } = require('../helpers/sesion');
+const { NOMBRE_SECCION_PROMOS } = require('../../services/menuService');
 
 const app = createTestApp();
 
@@ -389,7 +390,7 @@ describe('la sección de promociones en el menú', () => {
     const data = datosDelMenu(res.text);
 
     expect(data.promos).not.toBeNull();
-    expect(data.promos.name).toBe('Promociones');
+    expect(data.promos.name).toBe(NOMBRE_SECCION_PROMOS);
     expect(data.promos.products).toHaveLength(1);
   });
 
@@ -467,5 +468,186 @@ describe('la sección de promociones en el menú', () => {
 
     expect(res.text).not.toContain('</script><img');
     expect(res.text).toContain('\\u003c/script\\u003e');
+  });
+});
+
+// === Fase 6: el flyer y el nombre de la sección ===
+describe('flyer de promociones', () => {
+  let business;
+  let agent;
+
+  // Un PNG de 1x1 real: tiene que pasar el fileFilter por mimetype Y la
+  // verificación de magic bytes del archivo ya escrito, que es la capa que un
+  // buffer inventado no pasaría.
+  const PNG_1x1 = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==',
+    'base64'
+  );
+
+  beforeEach(async () => {
+    await resetDb();
+    business = await createBusiness({
+      slug: 'test-flyer',
+      name: 'Test Flyer',
+      adminEmail: 'flyer@test.local',
+      adminPassword: 'password-flyer-123'
+    });
+    agent = await loginAdmin(app, {
+      email: business.adminEmail,
+      password: business.adminPassword
+    });
+  });
+
+  const leerNegocio = async () => {
+    const [filas] = await getTestPool().query(
+      'SELECT * FROM businesses WHERE id = ?', [business.businessId]
+    );
+    return filas[0];
+  };
+
+  const subirFlyer = () => agent.post('/api/settings')
+    .field('name', business.name)
+    .field('promos_enabled', 'on')
+    .attach('flyer', PNG_1x1, 'flyer.png');
+
+  test('un negocio nuevo no tiene flyer', async () => {
+    expect((await leerNegocio()).promo_flyer).toBe('');
+  });
+
+  test('se sube y queda guardado bajo uploads del negocio', async () => {
+    const res = await subirFlyer();
+
+    expect(res.status).toBe(200);
+    expect((await leerNegocio()).promo_flyer)
+      .toMatch(new RegExp('^/uploads/' + business.businessId + '/'));
+  });
+
+  test('aparece en el menú cuando las promociones están encendidas', async () => {
+    await subirFlyer();
+
+    const res = await request(app).get('/s/test-flyer');
+    const flyer = (await leerNegocio()).promo_flyer;
+
+    expect(res.text).toContain('class="promo-flyer"');
+    expect(res.text).toContain(flyer);
+  });
+
+  // Es una promoción, así que la apaga el mismo interruptor que la sección.
+  test('con las promociones apagadas no aparece, aunque esté cargado', async () => {
+    await subirFlyer();
+    await getTestPool().query(
+      'UPDATE businesses SET promos_enabled = 0 WHERE id = ?', [business.businessId]
+    );
+
+    const res = await request(app).get('/s/test-flyer');
+
+    expect(res.text).not.toContain('class="promo-flyer"');
+    // Y no se borró: vuelve al encenderlo.
+    expect((await leerNegocio()).promo_flyer).not.toBe('');
+  });
+
+  test('sin flyer el menú no trae la etiqueta', async () => {
+    await agent.post('/api/settings').type('form')
+      .send({ name: business.name, promos_enabled: 'on' });
+
+    const res = await request(app).get('/s/test-flyer');
+    expect(res.text).not.toContain('class="promo-flyer"');
+  });
+
+  // Lo que banner y logo NO pueden hacer, y para un flyer es indispensable: la
+  // promoción termina y la lámina tiene que bajar.
+  test('se puede quitar', async () => {
+    await subirFlyer();
+    expect((await leerNegocio()).promo_flyer).not.toBe('');
+
+    const res = await agent.post('/api/settings').type('form')
+      .send({ name: business.name, promos_enabled: 'on', quitar_flyer: 'on' });
+
+    expect(res.status).toBe(200);
+    expect((await leerNegocio()).promo_flyer).toBe('');
+  });
+
+  test('guardar sin tocar el flyer no lo borra', async () => {
+    await subirFlyer();
+    const antes = (await leerNegocio()).promo_flyer;
+
+    await agent.post('/api/settings').type('form')
+      .send({ name: business.name, promos_enabled: 'on' });
+
+    expect((await leerNegocio()).promo_flyer).toBe(antes);
+  });
+
+  test('subir uno nuevo gana sobre la casilla de quitar', async () => {
+    // Si alguien marca "quitar" y además elige un archivo, lo que quiere es el
+    // archivo.
+    await subirFlyer();
+    const primero = (await leerNegocio()).promo_flyer;
+
+    await agent.post('/api/settings')
+      .field('name', business.name)
+      .field('promos_enabled', 'on')
+      .field('quitar_flyer', 'on')
+      .attach('flyer', PNG_1x1, 'otro.png');
+
+    const despues = (await leerNegocio()).promo_flyer;
+    expect(despues).not.toBe('');
+    expect(despues).not.toBe(primero);
+  });
+
+  test('un archivo que no es imagen se rechaza', async () => {
+    // Hereda las tres capas de services/imageUpload.js. Un .png con contenido de
+    // texto pasa el mimetype declarado pero no los magic bytes.
+    const res = await agent.post('/api/settings')
+      .field('name', business.name)
+      .attach('flyer', Buffer.from('no soy una imagen'), 'trampa.png');
+
+    expect(res.status).toBe(400);
+    expect((await leerNegocio()).promo_flyer).toBe('');
+  });
+});
+
+describe('el nombre de la sección de promociones', () => {
+  let business;
+  let agent;
+
+  beforeEach(async () => {
+    await resetDb();
+    business = await createBusiness({
+      slug: 'test-nombre',
+      name: 'Test Nombre',
+      adminEmail: 'nombre@test.local',
+      adminPassword: 'password-nombre-123'
+    });
+    agent = await loginAdmin(app, {
+      email: business.adminEmail,
+      password: business.adminPassword
+    });
+  });
+
+  // Las categorías de los negocios suelen estar en mayúsculas porque el dueño las
+  // escribió así; al lado, "Promociones" se veía en minúsculas.
+  test('es PROMOCIONES, en mayúsculas', async () => {
+    await agent.post('/api/products').type('form').send({
+      name: 'Con promo', description: '', price: '20000',
+      category_id: String(business.categoryId), promo_price: '15000'
+    });
+    await getTestPool().query(
+      'UPDATE businesses SET promos_enabled = 1 WHERE id = ?', [business.businessId]
+    );
+
+    const res = await request(app).get('/s/test-nombre');
+    const data = JSON.parse(res.text.match(/const menuData = (.+);/)[1]);
+
+    expect(data.promos.name).toBe('PROMOCIONES');
+  });
+
+  // No se resolvió con `text-transform: uppercase` a propósito: las categorías
+  // están en mayúsculas por el dato, no por CSS, y transformarlas cambiaría cómo
+  // se ven las de los negocios que las escribieron en mixto.
+  test('el CSS no transforma los títulos de categoría', async () => {
+    const res = await request(app).get('/s/test-nombre');
+    const css = res.text.match(/\.category-title \{[^}]*\}/)[0];
+
+    expect(css).not.toContain('text-transform');
   });
 });

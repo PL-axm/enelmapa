@@ -385,7 +385,65 @@ dos.
   que las categorías vacías, que ya se ocultan); un producto en promo se ve en la
   sección **y** en su categoría.
 
-### Fase 6 — Skin `grilla`
+### Fase 6 — Flyer de promoción + "PROMOCIONES" en mayúsculas ✅
+
+Pedido el 2026-08-13, después de ver la Fase 5 funcionando. Dos cosas de tamaño
+muy distinto que van juntas porque las dos son presentación de promociones.
+
+**1. El título en mayúsculas.** La sección se llama "Promociones" y al lado de
+"ENTRADAS 🥞" y "BOWLS CLÁSICOS 🍜" se ve en minúsculas.
+
+Un detalle que importa para no arreglarlo mal: **las categorías están en
+mayúsculas porque el dueño las escribió así**, no porque haya un
+`text-transform` en el CSS. CAFICULTOR las tiene en mixto ("Desayunos &
+Brunch 🥞"). Así que:
+
+- Poner `text-transform: uppercase` en `.category-title` cambiaría cómo se ven
+  las categorías de **todos** los negocios, incluidos los que las escribieron en
+  mixto a propósito. Descartado.
+- La sección de promos es la única cuyo nombre lo elegimos nosotros, así que se
+  escribe `PROMOCIONES` en la constante y listo. Calza con El Silvestre y va a
+  destacar en CAFICULTOR, que es el costo aceptado de tener un nombre fijo.
+
+**2. El flyer.** Una imagen sola, sin texto: el negocio arma su lámina de "2x1
+en tal producto" y la sube. Decidido con el usuario:
+
+- **Uno solo**, tipo banner, **arriba del menú** —entre el encabezado y la nav de
+  categorías— y fuera de la sección. Es lo primero que se ve al abrir.
+- **Tocarlo no hace nada.** Informa y se termina ahí: cero código que pueda
+  quedar roto, y si el flyer dice "2x1 en Bowls", el cliente scrollea y los
+  encuentra.
+
+Modelo: **una columna**, `businesses.promo_flyer VARCHAR(500) DEFAULT ''`, el
+mismo tipo que `banner_img` y `logo_img`. Sin tabla nueva.
+
+Decisiones y por qué:
+
+- **Lo gobierna `promos_enabled`**, el interruptor que ya existe. Apagar
+  promociones apaga también el flyer: es una promoción. Un negocio con flyer y
+  sin promos de producto lo enciende y ve el flyer sin sección, porque la sección
+  sigue escondiéndose cuando no hay productos vigentes.
+- **El flyer NO lleva vigencia propia** (fechas ni días). Es scope que no se
+  pidió: la promo de producto la tiene porque el precio cambia solo, mientras que
+  una imagen se sube y se baja a mano. Si más adelante hace falta un "flyer de
+  los martes", son tres columnas y **cero lógica nueva** — `promos.estado()` ya
+  hace exactamente eso.
+- **Tiene que poder quitarse.** Banner y logo hoy sólo se pueden reemplazar, no
+  borrar (está anotado como limitación en `PROCEDIMIENTO_CARGA_MENU.md`). Para un
+  flyer eso no sirve: la promoción termina y la lámina tiene que bajar. Va con
+  una casilla "Quitar el flyer" en Configuración.
+- **Va en el armazón, no en el skin.** Está fuera de la lista de productos, así
+  que es chrome y lo comparten todos los skins.
+- La subida pasa por `services/imageUpload.js` como todo lo demás, y hereda sus
+  tres capas: `fileFilter` por mimetype, magic bytes del archivo escrito, y
+  `nosniff` al servir.
+
+**Criterio de aceptación**: el flyer aparece sólo con promociones encendidas y
+con imagen cargada; se puede quitar; sin flyer el menú queda igual que antes; la
+sección se llama PROMOCIONES en el título, en el chip de la nav y en el
+desplegable.
+
+### Fase 7 — Skin `grilla`
 
 - `views/menu/grilla.ejs`: grilla de 2 columnas, foto arriba, nombre, descripción
   recortada, precio; categorías como chips; promos incluidas porque el contrato
@@ -422,7 +480,7 @@ Fase 6 al final para que la promo se implemente **una vez** en un skin y el
 segundo nazca sabiendo del badge. Al revés serían dos implementaciones y una
 migración de contrato en el medio.
 
-**Si preferís ver la grilla antes**, se puede mover la 6 delante de la 4-5: el
+**Si preferís ver la grilla antes**, se puede mover la 7 delante de la 4-5: el
 costo es implementar la tarjeta de promo en dos skins en vez de uno. Es una
 decisión de prioridad, no técnica.
 

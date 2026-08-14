@@ -61,16 +61,28 @@ function createApiRouter({ repos, services }) {
   // === BUSINESS SETTINGS ===
   router.post('/settings', authRequired, upload.fields([
     { name: 'banner', maxCount: 1 },
-    { name: 'logo', maxCount: 1 }
+    { name: 'logo', maxCount: 1 },
+    { name: 'flyer', maxCount: 1 }
   ]), verificarImagenes, validate(schemas.settings), asyncHandler(async (req, res) => {
     const {
       name, address, phone, whatsapp, instagram, facebook, tiktok,
-      is_open, menu_theme, menu_scale, promos_enabled, hours
+      is_open, menu_theme, menu_scale, promos_enabled, quitar_flyer, hours
     } = req.body;
 
+    const rutaSubida = (campo) =>
+      '/uploads/' + req.session.businessId + '/' + req.files[campo][0].filename;
+
     let banner_img, logo_img;
-    if (req.files?.banner) banner_img = '/uploads/' + req.session.businessId + '/' + req.files.banner[0].filename;
-    if (req.files?.logo) logo_img = '/uploads/' + req.session.businessId + '/' + req.files.logo[0].filename;
+    if (req.files?.banner) banner_img = rutaSubida('banner');
+    if (req.files?.logo) logo_img = rutaSubida('logo');
+
+    // Tres estados para el flyer, y el orden importa: subir uno nuevo gana sobre
+    // la casilla de quitar, porque si alguien marca "quitar" y encima elige un
+    // archivo, lo que quiere es el archivo. `undefined` deja la columna intacta
+    // —el repo sólo escribe lo que viene definido—, y `''` la vacía.
+    let promo_flyer;
+    if (req.files?.flyer) promo_flyer = rutaSubida('flyer');
+    else if (quitar_flyer) promo_flyer = '';
 
     const scope = repos.businesses.forBusiness(req.session.businessId);
 
@@ -82,7 +94,8 @@ function createApiRouter({ repos, services }) {
     // nada. Pasó con `menu_scale` y lo agarró su test de integración.
     await scope.update({
       name, address, phone, whatsapp, instagram, facebook, tiktok,
-      is_open, menu_theme, menu_scale, promos_enabled, banner_img, logo_img
+      is_open, menu_theme, menu_scale, promos_enabled,
+      banner_img, logo_img, promo_flyer
     });
 
     // Ya viene parseado y validado por el esquema: el try/catch del JSON y el

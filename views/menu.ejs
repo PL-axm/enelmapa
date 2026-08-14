@@ -38,6 +38,11 @@
   .info-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 16px; padding: 10px 16px; background: none; border: 1px solid var(--border); border-radius: var(--radius); font-family: inherit; font-size: 14px; font-weight: 500; color: var(--text-primary); cursor: pointer; transition: background 0.2s; }
   .info-btn:hover { background: var(--category-bg); }
 
+  <%# `width: 100%` + `height: auto` y nada de recorte: la lámina la diseñó el
+      negocio y cortarla por un alto fijo taparía justo lo que quiso decir. La
+      página se estira según la proporción de la imagen. %>
+  .promo-flyer { display: block; width: 100%; height: auto; }
+
   .cat-nav { position: sticky; top: 0; z-index: 100; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: stretch; }
   .cat-nav-actions { display: flex; align-items: center; flex-shrink: 0; border-right: 1px solid var(--border); }
   .cat-nav-action { background: none; border: none; padding: 10px 12px; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; transition: color 0.2s; }
@@ -150,6 +155,19 @@
       Información
     </button>
   </div>
+
+  <%# El flyer va acá: después del encabezado y ANTES de la nav, que es sticky.
+      Al revés la nav se pegaría arriba y el flyer scrollearía por debajo de ella.
+
+      Se muestra sólo con las promociones encendidas, porque es una promoción: el
+      mismo interruptor que la sección. Y no es un enlace ni abre nada — informa
+      y se termina ahí, así no hay nada que pueda quedar roto.
+
+      Vive en el armazón y no en el skin porque está fuera de la lista de
+      productos: es chrome, y lo comparten todos los skins. %>
+  <% if (business.promos_enabled && business.promo_flyer) { %>
+    <img class="promo-flyer" src="<%= business.promo_flyer %>" alt="Promociones de <%= business.name %>">
+  <% } %>
 
   <nav class="cat-nav" id="catNav">
     <div class="cat-nav-actions">
