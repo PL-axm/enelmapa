@@ -567,15 +567,18 @@ describe('flyer de promociones', () => {
     expect(res.text).toContain("e.key === 'Escape'");
   });
 
-  test('la clave de "ya lo vio" incluye la imagen, así un flyer nuevo se vuelve a mostrar', async () => {
-    // Con una clave fija, quien cierra un aviso una vez no volvería a ver ninguna
-    // promoción nunca más en esa pestaña.
+  // Se probó primero con `sessionStorage` para no repetirlo al recargar, y se
+  // sacó: quien cerraba el aviso y refrescaba creía que algo se había roto, y el
+  // negocio que armó la lámina quiere que se vea. Un menú se abre y se cierra, no
+  // se navega, así que "cada carga" es casi siempre "una vez" igual.
+  test('se muestra en cada carga, sin recordar que ya se vio', async () => {
     await subirFlyer();
 
     const res = await request(app).get('/s/test-flyer');
 
-    expect(res.text).toContain("'flyer:' + popup.dataset.flyer");
-    expect(res.text).toContain('sessionStorage');
+    expect(res.text).toContain("popup.classList.add('open')");
+    // Ni rastro del recuerdo: si vuelve, este test avisa.
+    expect(res.text).not.toMatch(/sessionStorage\.(get|set)Item/);
   });
 
   test('ya NO se muestra como banner suelto arriba del menú', async () => {

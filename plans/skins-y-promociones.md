@@ -450,11 +450,14 @@ nav; ahora es un aviso que aparece encima del menú al abrirlo.
 
 - **Reemplaza al banner, no se suma.** "Que sea un popup" es eso: si quedaran los
   dos, el negocio tendría la misma imagen dos veces en la misma pantalla.
-- **Se muestra una vez por visita**, no en cada carga. La clave de
-  `sessionStorage` incluye la URL de la imagen, así que **si el negocio cambia el
-  flyer, el visitante que ya lo cerró vuelve a ver el nuevo**. Sin eso, quien
-  cierra el aviso una vez no vuelve a ver ninguna promoción nunca más en esa
-  pestaña.
+- **Se muestra en cada carga del menú.** Se probó primero con `sessionStorage`
+  para no repetirlo al recargar, y se sacó al usarlo: quien cierra el aviso y
+  refresca cree que algo se rompió, y el negocio que armó la lámina quiere que se
+  vea. Un menú se abre y se cierra, no se navega, así que "cada carga" es casi
+  siempre "una vez" igual. Si alguna vez hay que no repetirlo, la forma correcta
+  es una clave que INCLUYA la URL de la imagen —así un flyer nuevo se vuelve a
+  mostrar— y en try/catch, porque en modo privado el solo acceso a
+  `sessionStorage` lanza en algunos navegadores.
 - **Se cierra con la X, con el fondo y con Escape.** Un popup del que no se sale
   fácil es peor que no tenerlo.
 - `z-index: 250`, arriba de todo lo demás (los modales están en 200, el FAB y el
@@ -464,8 +467,8 @@ nav; ahora es un aviso que aparece encima del menú al abrirlo.
 - El interruptor sigue siendo el mismo, `promos_enabled`.
 
 **Costo aceptado, que conviene tener escrito**: un banner se podía volver a mirar
-scrolleando; un popup cerrado desaparece por esa visita. Se gana atención, se
-pierde permanencia. Si más adelante molesta, dejar el banner *además* del popup
+scrolleando; un popup cerrado desaparece hasta la próxima carga. Se gana atención,
+se pierde permanencia. Si más adelante molesta, dejar el banner *además* del popup
 es una línea.
 
 **Criterio de aceptación**: aparece al abrir el menú con promociones encendidas y
