@@ -108,7 +108,9 @@ businesses.promos_enabled TINYINT   -- governs promos AND the flyer
 businesses.promo_flyer VARCHAR(500) -- one image, shown as a popup on load
 ```
 
-`promo_price NULL` is the switch — not a separate `promo_active`, because two sources for one fact end up contradicting each other; and `NULL` rather than `0` because `0` is a valid price. `promo_days` position 0 is **Sunday**, matching `business_hours.day_index` and `Date.getDay()`; a second weekday convention in the same database is a silent off-by-one waiting to happen.
+**A promotion exists when there is a promotional price OR a label** — both are legitimate: lowering the price shows the old one struck through, while a `2x1` or a "wings Tuesday" doesn't change the unit price at all, it changes what you get. The first version required a price, which made the most common restaurant promotion impossible to enter. That switch is duplicated in three places by necessity (`validators`, `services/promos.js`, `productRepository`) and each one says so.
+
+`promo_price` is what makes the strikethrough appear — not a separate `promo_active`, because two sources for one fact end up contradicting each other; and `NULL` rather than `0` because `0` is a valid price. `promo_days` position 0 is **Sunday**, matching `business_hours.day_index` and `Date.getDay()`; a second weekday convention in the same database is a silent off-by-one waiting to happen.
 
 `services/promos.js` decides validity and is **pure**: `estado(producto, hoy)` returns `activa` / `programada` / `vencida` / `fuera-de-dia` / `sin-promo`, and the panel shows that state per product — without it the owner loads a promo, doesn't see it in the menu and has no way to know why.
 

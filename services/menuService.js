@@ -41,8 +41,12 @@ function menuService() {
       // `null` y no un objeto vacío: el skin pregunta `if (p.promo)`, y un
       // objeto siempre presente obligaría a mirar adentro para saber si hay
       // promoción.
+      //
+      // `price` puede venir en null: es una promo de sólo etiqueta ("2x1"), donde
+      // el precio unitario no cambia. El skin muestra el precio normal y el badge,
+      // sin tachado — no hay nada que tachar.
       promo: enPromo
-        ? { price: p.promo_price, label: p.promo_label || '' }
+        ? { price: p.promo_price ?? null, label: p.promo_label || '' }
         : null
     };
   }
