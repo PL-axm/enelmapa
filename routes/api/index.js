@@ -66,7 +66,7 @@ function createApiRouter({ repos, services }) {
   ]), verificarImagenes, validate(schemas.settings), asyncHandler(async (req, res) => {
     const {
       name, address, phone, whatsapp, instagram, facebook, tiktok,
-      is_open, menu_theme, menu_scale, promos_enabled, quitar_flyer, hours
+      is_open, menu_theme, menu_template, menu_scale, promos_enabled, quitar_flyer, hours
     } = req.body;
 
     const rutaSubida = (campo) =>
@@ -94,7 +94,7 @@ function createApiRouter({ repos, services }) {
     // nada. Pasó con `menu_scale` y lo agarró su test de integración.
     await scope.update({
       name, address, phone, whatsapp, instagram, facebook, tiktok,
-      is_open, menu_theme, menu_scale, promos_enabled,
+      is_open, menu_theme, menu_template, menu_scale, promos_enabled,
       banner_img, logo_img, promo_flyer
     });
 

@@ -75,7 +75,9 @@ function createAdminRouter({ repos, services, config }) {
       paletas: tema.paletasParaUI(),
       paletaPorDefecto: tema.PALETA_POR_DEFECTO,
       escalas: tema.escalasParaUI(),
-      escalaPorDefecto: tema.ESCALA_POR_DEFECTO
+      escalaPorDefecto: tema.ESCALA_POR_DEFECTO,
+      templates: tema.templatesParaUI(),
+      templatePorDefecto: tema.TEMPLATE_POR_DEFECTO
     });
   }));
 

@@ -443,7 +443,7 @@ con imagen cargada; se puede quitar; sin flyer el menú queda igual que antes; l
 sección se llama PROMOCIONES en el título, en el chip de la nav y en el
 desplegable.
 
-### Fase 7 — Skin `grilla`
+### Fase 7 — Skin `grilla` ✅
 
 - `views/menu/grilla.ejs`: grilla de 2 columnas, foto arriba, nombre, descripción
   recortada, precio; categorías como chips; promos incluidas porque el contrato

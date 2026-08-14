@@ -1,0 +1,179 @@
+<%#
+  Skin "grilla" — dos columnas, foto grande arriba y el texto abajo, como las
+  apps de delivery.
+
+  Mismo contrato que el clásico y nada más que eso: su CSS y su `window.SKIN`.
+  Todo el chrome —banner, encabezado, nav, buscador, modales, footer, FAB, flyer,
+  y los estilos del precio en promoción que usa el modal— es del armazón.
+
+  El id interno es `grilla` y no el nombre de la app en la que se inspira: esa es
+  marca registrada de otra empresa, y como identificador en el código envejece
+  mal. En la UI se llama "Cuadrícula".
+%>
+<style>
+  .menu-content { padding: 0 16px 80px; }
+  .category-section { padding-top: 24px; }
+  .category-title { font-size: calc(18px * var(--escala)); font-weight: 700; color: var(--text-primary); padding-bottom: 14px; margin-bottom: 2px; position: relative; }
+  .category-title::after { content: ''; position: absolute; bottom: 8px; left: 0; width: 32px; height: 2px; background: var(--accent); border-radius: 1px; }
+
+  <%# Dos columnas fijas, no `auto-fill`: el contenedor tiene 720px de ancho
+      máximo, así que un `minmax` terminaría dando dos columnas igual en casi
+      todos los anchos y tres sólo en un rango angosto donde las tarjetas quedan
+      raquíticas. Dos es la decisión, escrita como tal. %>
+  .product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; }
+
+  .product-card { display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+  .product-card:active { transform: scale(0.985); }
+
+  <%# `aspect-ratio` y no un alto fijo: las fotos de los negocios vienen de
+      cualquier proporción y un alto en px las recortaría distinto según el ancho
+      de la pantalla. Con 1/1 el recorte es predecible y la grilla queda pareja,
+      que es la razón de elegir una grilla. %>
+  .product-img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background: var(--category-bg); display: block; }
+
+  <%# Sin foto NO se deja el hueco vacío ni se colapsa la tarjeta: se ocupa el
+      mismo cuadrado con la inicial del producto. Colapsarla desalinearía la
+      grilla —en CSS grid las filas comparten alto, así que una tarjeta sin foto
+      al lado de una con foto se estira igual y queda un vacío peor—. Y hay
+      negocios donde falta en muchos productos: CAFICULTOR tiene 114. %>
+  .product-img-vacia { width: 100%; aspect-ratio: 1 / 1; background: var(--category-bg); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: calc(30px * var(--escala)); font-weight: 700; user-select: none; }
+
+  .product-info { padding: 10px 12px 12px; display: flex; flex-direction: column; flex: 1; }
+  .product-name { font-size: calc(14px * var(--escala)); font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+  .product-desc { font-size: calc(12px * var(--escala)); color: var(--text-muted); margin-top: 4px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  <%# `margin-top: auto` empuja el precio al pie de la tarjeta, así queda a la
+      misma altura en las dos columnas aunque una descripción ocupe una línea y
+      la otra dos. %>
+  .product-price { font-size: calc(14px * var(--escala)); font-weight: 700; color: var(--accent); margin-top: auto; padding-top: 8px; }
+
+  @media (max-width: 600px) {
+    .menu-content { padding: 0 14px 100px; }
+    .product-grid { gap: 10px; }
+    .product-info { padding: 9px 10px 11px; }
+  }
+  @media (max-width: 380px) {
+    .menu-content { padding: 0 12px 100px; }
+    .product-grid { gap: 8px; }
+    .product-name { font-size: calc(13.5px * var(--escala)); }
+  }
+  <%# La foto cuadrada funciona en celular, donde cada tarjeta mide ~170px de
+      ancho. En pantallas grandes el contenedor llega a 720px, así que la tarjeta
+      pasa a ~337px y un cuadrado de ese tamaño da una tarjeta de 444px de alto:
+      cada producto ocupaba media pantalla y había que scrollear muchísimo.
+
+      Se aplana la imagen en vez de pasar a tres columnas, para no cambiar el
+      diseño de dos columnas que es el elegido: a 3/2 la tarjeta queda en ~330px
+      de alto y entran cuatro productos por pantalla.
+
+      El corte está en 481px y no en 601px porque un celular en vertical llega
+      hasta ~430px: de ahí para arriba ya es celular acostado o tablet, donde la
+      tarjeta es ancha y el cuadrado vuelve a estirarla (a 600px daba 378px de
+      alto). %>
+  @media (min-width: 481px) {
+    .product-img, .product-img-vacia { aspect-ratio: 3 / 2; }
+  }
+  @media (min-width: 901px) {
+    .product-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  }
+
+  <%# En los resultados de la búsqueda el armazón mete las tarjetas directo en
+      `#searchResults`, sin pasar por `contenedorProductos()`. Sin esto quedarían
+      una debajo de otra a ancho completo, con la foto gigante. La grilla se
+      declara también ahí. %>
+  .search-results { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; align-content: start; }
+  .search-results .search-empty { grid-column: 1 / -1; }
+</style>
+<script>
+  window.SKIN = {
+    // Acá sí un elemento y no un fragmento: la grilla NECESITA un contenedor con
+    // `display: grid` para que las tarjetas se acomoden en dos columnas. El skin
+    // clásico devuelve un fragmento porque su lista no lo necesita, y por eso el
+    // contenedor es decisión del skin.
+    contenedorProductos: function () {
+      var grid = document.createElement('div');
+      grid.className = 'product-grid';
+      return grid;
+    },
+
+    tarjetaProducto: function (p, helpers) {
+      var card = document.createElement('div');
+      card.className = 'product-card';
+
+      // La inicial, no el nombre: el nombre ya está justo abajo, y repetirlo
+      // grande dentro del cuadrado se lee como un error de maquetación.
+      var placeholder = function () {
+        var vacia = document.createElement('div');
+        vacia.className = 'product-img-vacia';
+        vacia.textContent = (p.name || '?').trim().charAt(0).toUpperCase();
+        return vacia;
+      };
+
+      if (p.img) {
+        var img = document.createElement('img');
+        img.className = 'product-img';
+        img.src = p.img;
+        img.alt = p.name;
+        // Se mantiene el lazy: una grilla de 114 productos con foto es mucha
+        // imagen para pedir toda de una.
+        img.loading = 'lazy';
+
+        // Un producto puede tener un path guardado cuyo archivo ya no está —un
+        // borrado a mano, una restauración incompleta—. Para quien mira el menú
+        // eso es lo mismo que "sin foto", pero sin este reemplazo se ve el ícono
+        // de imagen rota ocupando el lugar más visible de la tarjeta. En este skin
+        // la foto es la mitad de la tarjeta, así que importa más que en el clásico
+        // (donde es un recuadro de 90px y se deja como está).
+        img.addEventListener('error', function () {
+          if (img.parentNode) img.parentNode.replaceChild(placeholder(), img);
+        });
+
+        card.appendChild(img);
+      } else {
+        card.appendChild(placeholder());
+      }
+
+      var info = document.createElement('div');
+      info.className = 'product-info';
+
+      // `textContent` y no `innerHTML`: el nombre y la descripción los escribe el
+      // dueño del negocio y se muestran a cualquiera que abra el menú.
+      var name = document.createElement('div');
+      name.className = 'product-name';
+      name.textContent = p.name;
+      info.appendChild(name);
+
+      if (p.desc) {
+        var desc = document.createElement('div');
+        desc.className = 'product-desc';
+        desc.textContent = p.desc;
+        info.appendChild(desc);
+      }
+
+      var price = document.createElement('div');
+      price.className = 'product-price';
+
+      if (p.promo) {
+        var viejo = document.createElement('span');
+        viejo.className = 'product-price-old';
+        viejo.textContent = helpers.formatPrice(p.price);
+        price.appendChild(viejo);
+
+        price.appendChild(document.createTextNode(helpers.formatPrice(p.promo.price)));
+
+        if (p.promo.label) {
+          var badge = document.createElement('span');
+          badge.className = 'promo-badge';
+          badge.textContent = p.promo.label;
+          price.appendChild(badge);
+        }
+      } else {
+        price.textContent = helpers.formatPrice(p.price);
+      }
+
+      info.appendChild(price);
+      card.appendChild(info);
+
+      return card;
+    }
+  };
+</script>

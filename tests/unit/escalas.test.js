@@ -50,19 +50,37 @@ describe('escalas tipográficas', () => {
     const path = require('path');
 
     const PISO_PX = 11;
-    const skin = fs.readFileSync(
-      path.join(__dirname, '../../views/menu/clasico.ejs'), 'utf8'
-    );
 
-    const bases = [...skin.matchAll(/calc\(([\d.]+)px \* var\(--escala\)\)/g)]
-      .map(m => Number(m[1]));
-
-    expect(bases.length).toBeGreaterThan(0);   // si el regex deja de matchear, se sabe
+    // Se leen TODOS los skins y también el armazón, en vez de nombrar archivos:
+    // así un skin nuevo queda cubierto por este piso desde el día uno, sin que
+    // nadie tenga que acordarse de agregarlo acá. (La primera versión miraba sólo
+    // clasico.ejs, y el skin en grilla habría entrado sin control.)
+    const dirSkins = path.join(__dirname, '../../views/menu');
+    const archivos = [
+      path.join(__dirname, '../../views/menu.ejs'),
+      ...fs.readdirSync(dirSkins).map(f => path.join(dirSkins, f))
+    ];
 
     const factorMasChico = Math.min(...Object.values(ESCALAS).map(e => e.factor));
-    const masChico = Math.min(...bases) * factorMasChico;
+    let revisados = 0;
 
-    expect(masChico).toBeGreaterThanOrEqual(PISO_PX);
+    for (const archivo of archivos) {
+      const bases = [...fs.readFileSync(archivo, 'utf8')
+        .matchAll(/calc\(([\d.]+)px \* var\(--escala\)\)/g)].map(m => Number(m[1]));
+
+      for (const base of bases) {
+        revisados++;
+        // El objeto en el expect hace que el mensaje de fallo diga QUÉ archivo y
+        // qué tamaño, en vez de sólo un número suelto.
+        expect({ archivo: path.basename(archivo), base, resultante: base * factorMasChico })
+          .toEqual({ archivo: path.basename(archivo), base, resultante: expect.any(Number) });
+        expect(base * factorMasChico).toBeGreaterThanOrEqual(PISO_PX);
+      }
+    }
+
+    // Si el regex deja de matchear —porque alguien cambia la forma del calc— este
+    // test pasaría vacío y en silencio.
+    expect(revisados).toBeGreaterThan(5);
   });
 
   test('cada escala tiene nombre y descripción para el panel', () => {

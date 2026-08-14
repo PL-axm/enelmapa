@@ -44,7 +44,56 @@
 </div>
 
 <div class="card">
-  <h3>Tema del menú</h3>
+  <%# El diseño (layout) es un eje aparte del color y del tamaño: cualquier
+      combinación de los tres es válida, y por eso son tres selectores y no una
+      lista de "estilos" predefinidos.
+
+      La vista previa es un dibujo en CSS y no una captura: una imagen habría que
+      regenerarla cada vez que el skin cambie, y quedaría vieja sin que nada
+      avise. %>
+  <h3>Diseño del menú</h3>
+  <p style="font-size:13px;color:#6B6860;margin-bottom:16px">Cómo se acomodan los productos en tu menú</p>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:28px">
+    <% templates.forEach(function(t) { %>
+      <% var elegido = (business.menu_template || templatePorDefecto) === t.id; %>
+      <label style="cursor:pointer;text-align:center">
+        <input type="radio" name="menu_template" value="<%= t.id %>" <%= elegido ? 'checked' : '' %> style="display:none">
+        <div class="tpl-option<%= elegido ? ' tpl-elegido' : '' %>">
+          <% if (t.id === 'grilla') { %>
+            <div class="tpl-grilla">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          <% } else { %>
+            <div class="tpl-lista">
+              <span></span><span></span><span></span>
+            </div>
+          <% } %>
+        </div>
+        <span style="font-size:12px;color:#6B6860;display:block"><%= t.nombre %></span>
+        <span style="font-size:11px;color:#9C9889;display:block;max-width:110px"><%= t.descripcion %></span>
+      </label>
+    <% }) %>
+  </div>
+  <style>
+    .tpl-option{width:96px;height:70px;border-radius:10px;border:3px solid #E8E5DE;background:#FAFAF7;padding:8px;margin-bottom:4px;transition:border-color .2s;}
+    .tpl-option.tpl-elegido{border-color:#C8956C;}
+    .tpl-lista{display:flex;flex-direction:column;gap:5px;height:100%;}
+    .tpl-lista span{display:block;height:14px;background:#E0DAD0;border-radius:3px;}
+    .tpl-grilla{display:grid;grid-template-columns:1fr 1fr;gap:5px;height:100%;}
+    .tpl-grilla span{display:block;background:#E0DAD0;border-radius:3px;}
+  </style>
+  <script>
+    document.querySelectorAll('input[name="menu_template"]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        document.querySelectorAll('.tpl-option').forEach(function (d) {
+          d.classList.remove('tpl-elegido');
+        });
+        this.parentElement.querySelector('.tpl-option').classList.add('tpl-elegido');
+      });
+    });
+  </script>
+
+  <h3>Color del menú</h3>
   <p style="font-size:13px;color:#6B6860;margin-bottom:16px">Elige el color de fondo de tu menú digital</p>
   <%# Las opciones salen de theme/ (paletasParaUI). Antes estaban escritas una
       por una acá, con el fondo y el color de texto de cada tema copiados a
