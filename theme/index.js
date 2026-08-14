@@ -77,6 +77,7 @@ module.exports = {
   TEMPLATES: templates.TEMPLATES,
   TEMPLATE_POR_DEFECTO: templates.TEMPLATE_POR_DEFECTO,
   idsDeTemplates: templates.idsDeTemplates,
+  templatesParaUI: templates.templatesParaUI,
   esTemplateValido: templates.esTemplateValido,
   plantillaOPorDefecto: templates.plantillaOPorDefecto,
 

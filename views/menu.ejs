@@ -43,6 +43,21 @@
       página se estira según la proporción de la imagen. %>
   .promo-flyer { display: block; width: 100%; height: auto; }
 
+  <%# Los precios de promoción viven ACÁ y no en el skin, aunque los dibuje la
+      tarjeta: el modal de producto —que es del armazón— usa las mismas clases.
+      Estaban en views/menu/clasico.ejs, así que el modal se veía bien sólo
+      porque ese era el único skin; con un segundo skin que no las declarara,
+      el tachado y el badge del modal habrían quedado sin estilo. Lo que usa el
+      chrome se declara en el chrome.
+
+      El badge es contorneado y no relleno a propósito. Con fondo de acento y
+      texto claro el contraste depende de la paleta —sobre el acento marrón de la
+      paleta clara, el texto blanco queda en ~2.5:1, ilegible—. Con el acento como
+      color de texto y borde hereda el contraste que esa paleta ya garantiza para
+      los precios, en las cinco. %>
+  .product-price-old { font-size: calc(12.5px * var(--escala)); font-weight: 400; color: var(--text-muted); text-decoration: line-through; margin-right: 7px; }
+  .promo-badge { display: inline-block; margin-left: 7px; padding: 1px 7px; border: 1px solid var(--accent); border-radius: 20px; font-size: calc(12px * var(--escala)); font-weight: 600; color: var(--accent); vertical-align: 1px; }
+
   .cat-nav { position: sticky; top: 0; z-index: 100; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: stretch; }
   .cat-nav-actions { display: flex; align-items: center; flex-shrink: 0; border-right: 1px solid var(--border); }
   .cat-nav-action { background: none; border: none; padding: 10px 12px; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; transition: color 0.2s; }

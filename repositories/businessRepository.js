@@ -17,7 +17,7 @@
 
 const TENANT_FIELDS = [
   'name', 'address', 'phone', 'whatsapp', 'instagram', 'facebook', 'tiktok',
-  'is_open', 'menu_theme', 'menu_scale', 'promos_enabled',
+  'is_open', 'menu_theme', 'menu_template', 'menu_scale', 'promos_enabled',
   'banner_img', 'logo_img', 'promo_flyer'
 ];
 

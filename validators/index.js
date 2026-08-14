@@ -229,6 +229,7 @@ const schemas = {
     // ofrecía `navy` y esto aceptaba `blue`, así que la quinta paleta devolvía
     // 400 y `blue` se guardaba sin tener CSS.
     menu_theme: z.enum(tema.idsDePaletas()).optional().default(tema.PALETA_POR_DEFECTO),
+    menu_template: z.enum(tema.idsDeTemplates()).optional().default(tema.TEMPLATE_POR_DEFECTO),
     menu_scale: z.enum(tema.idsDeEscalas()).optional().default(tema.ESCALA_POR_DEFECTO),
     promos_enabled: checkbox,
     // El flyer se reemplaza subiendo otro, pero también tiene que poder QUITARSE:
