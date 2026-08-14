@@ -53,7 +53,73 @@ Repos are built over an *executor*, not the pool: `buildRepos(db)` where `db` is
 
 ### Services
 
-`services/` holds decisions that aren't routing or storage: `authService` (bcrypt cost, and the decoy hash that equalizes login timing), `businessService.createWithDefaults()` (the `withTransaction` call site), `qrService`, `menuService`, `logger`, `imageUpload`, `subdomain`, `superadminAuth`. `routes/` is wiring: read input, call a service or repo, render or respond.
+`services/` holds decisions that aren't routing or storage: `authService` (bcrypt cost, and the decoy hash that equalizes login timing), `businessService.createWithDefaults()` (the `withTransaction` call site), `qrService`, `menuService`, `promos`, `logger`, `imageUpload`, `jsonInline`, `subdomain`, `superadminAuth`. `routes/` is wiring: read input, call a service or repo, render or respond.
+
+**`jsonInline(valor)`** is how data gets embedded in a page — never bare `JSON.stringify`. It escapes `<`, `>`, `&`, the single quote and U+2028/2029 as `\uXXXX`, which stays valid JSON *and* valid JavaScript. Two live bugs came from not having it: a product named `</script><img src=x onerror=…>` closed the menu's script tag, and a description containing `pico e' gallo` truncated an `onclick='…'` attribute so the Edit button stopped working. It deliberately does **not** escape double quotes (they're structural in `JSON.stringify` output), so its contract requires **single-quoted** attributes.
+
+### `theme/` — the menu's look, as data
+
+Three independent axes, each a registry with one list and several consumers:
+
+| Axis | Column | Registry |
+|---|---|---|
+| Colour (palette) | `menu_theme` — *despite the name, it is only colours* | `theme/paletas.js` |
+| Layout (skin) | `menu_template` | `theme/templates.js` |
+| Type size | `menu_scale` | `theme/escalas.js` |
+
+Any combination of the three is valid, which is why they're three columns and not one "style".
+
+**Add a palette, skin or scale in `theme/` and nowhere else.** The validator builds its `z.enum` from the registry, the settings view iterates it to draw the options, and the menu emits the CSS from it. That list used to be written three times and it desynchronised: the panel offered `navy` while the validator accepted `blue`, so the fifth palette returned 400 and `blue` saved fine but had no CSS and silently rendered as light. `tests/unit/theme.test.js` now fails if the validator and the registry disagree.
+
+The scale is a **multiplier**, not a table of sizes: `font-size: calc(14.5px * var(--escala))`. The tuned px values stay where they are and keep changing per breakpoint; the scale only stretches them proportionally. `normal` is exactly `1`. A test reads every `calc(Npx * var(--escala))` in the shell and all skins and refuses a resulting size under 11px.
+
+### Skins: shell + `views/menu/*.ejs`
+
+`views/menu.ejs` is the **shell**: head, palette/scale CSS variables, the shared chrome (banner, header, category nav, search, product modal, info modal, footer, WhatsApp FAB, promo popup) and the script that drives navigation, scroll-spy, search and the modal. It includes one skin.
+
+A skin is its own `<style>` plus one object, and nothing else:
+
+```js
+window.SKIN = {
+  contenedorProductos()          // where a category's cards go
+  tarjetaProducto(p, helpers)    // the DOM node for one card
+};
+```
+
+`contenedorProductos` is what makes the contract worth having: `clasico` returns a `DocumentFragment` (its list needs no wrapper), `grilla` returns a `div` with `display: grid`. `helpers.formatPrice` is passed in rather than read as a global, because the skin's script runs in `<head>` before the shell defines anything.
+
+Two rules that are easy to get wrong:
+
+- **The shell calls `tarjetaProducto` twice** — for the menu and for search results. Never build a card by hand somewhere else; that's how the search version ended up concatenating `p.name` into `innerHTML` while the menu used `textContent`.
+- **Anything the chrome uses is declared in the chrome.** `.product-price-old` and `.promo-badge` live in the shell because the product modal uses them. They were in `clasico.ejs` and looked fine only because it was the single skin.
+
+**The skin is resolved in the router**, via `plantillaOPorDefecto`, never from `business.menu_template` in the view: the shell does `include('menu/' + plantilla)`, so a value hand-written into that column would otherwise become an arbitrary include.
+
+### Promotions
+
+A promotional price on an existing product, with validity. There's no standalone "promo" entity.
+
+```sql
+products.promo_price DECIMAL NULL   -- NULL is the on/off switch
+products.promo_label VARCHAR(40)    -- "2x1", "-30%"
+products.promo_from / promo_to DATE -- NULL = no start / no expiry, both inclusive
+products.promo_days CHAR(7)         -- '0010100'; POSITION 0 IS SUNDAY
+businesses.promos_enabled TINYINT   -- governs promos AND the flyer
+businesses.promo_flyer VARCHAR(500) -- one image, shown as a popup on load
+```
+
+`promo_price NULL` is the switch — not a separate `promo_active`, because two sources for one fact end up contradicting each other; and `NULL` rather than `0` because `0` is a valid price. `promo_days` position 0 is **Sunday**, matching `business_hours.day_index` and `Date.getDay()`; a second weekday convention in the same database is a silent off-by-one waiting to happen.
+
+`services/promos.js` decides validity and is **pure**: `estado(producto, hoy)` returns `activa` / `programada` / `vencida` / `fuera-de-dia` / `sin-promo`, and the panel shows that state per product — without it the owner loads a promo, doesn't see it in the menu and has no way to know why.
+
+**The clock, and it is the delicate part:**
+
+- Evaluated **server-side**. A promo that appears according to the visitor's phone clock cannot be supported.
+- In the business's timezone (`config.zonaHoraria`, `America/Bogota`), never UTC. If the process runs in UTC, "today" flips at 7pm Colombian time and a promo expiring "on the 31st" would switch off on the 30th at 19:00.
+- **The date is injected, never read inside**: the router computes `promos.hoyEn(config.zonaHoraria)` and passes it. A `new Date()` in there would make a "Tuesday promo" test pass today and fail on Thursday.
+- **mysql2 returns a `DATE` column as a `Date` at the process's *local* midnight.** `toISOString()` on that shifts the date by a day on any server east of Greenwich. Use `promos.aFechaTexto`, which reads the local components — the ones mysql2 put there.
+
+`menuService.buildMenu` returns `{ promos, categorias }`. `promos` is `null` when the section is off, when nothing is valid today, or when no date was passed, so **the decision to show the section lives in one place**. A product on promotion appears in the section *and* in its own category: the section is a shortcut, not a move.
 
 ### Request-edge conventions
 
@@ -97,7 +163,15 @@ Two constraints worth knowing before writing one:
 
 `001_initial.sql` is the schema frozen at the point migrations were introduced, written with `IF NOT EXISTS` so it is a no-op against the production database that already had those tables.
 
-Core tables: `businesses` (1 per tenant, has `slug`, contact/social fields, `is_open`, `menu_theme`) → `business_hours` (7 rows/business), `categories` → `products`, and `users` (admin logins, one business each via `business_id` FK), plus `schema_migrations` and `sessions`. All tenant-scoped queries filter by `business_id`.
+Core tables: `businesses` (1 per tenant, has `slug`, contact/social fields, `is_open`, `menu_theme`/`menu_template`/`menu_scale`, `promos_enabled`, `promo_flyer`) → `business_hours` (7 rows/business), `categories` → `products` (with the `promo_*` columns), and `users` (admin logins, one business each via `business_id` FK), plus `schema_migrations` and `sessions`. All tenant-scoped queries filter by `business_id`.
+
+**Adding a column to `businesses` means touching THREE places**, and missing any one makes the save return `200` without saving that field:
+
+1. the schema in `validators/index.js`,
+2. the `TENANT_FIELDS` whitelist in `repositories/businessRepository.js`,
+3. the destructuring in the `/api/settings` handler.
+
+This has bitten twice — `menu_scale` and then `promos_enabled`, the second time with a warning comment already sitting next to it. So it stopped being something to remember: the test *"cada campo de Configuración se guarda de verdad"* sends every field and checks each one landed in the database. Add the new field to that test and a forgotten wiring fails the suite.
 
 `sessions` (`express-mysql-session`, built in `db/sessionStore.js`) does **not** hang off `businesses`, so the `ON DELETE CASCADE` chain never reaches it — anything that clears tenant data has to clear it separately. Sessions live in MySQL rather than the default `MemoryStore` because Passenger recycles Node processes, which used to drop every in-memory session and produce random `302`s to `/admin/login` seconds after a successful login.
 

@@ -220,6 +220,41 @@ Detalle completo (estructura de `tests/`, cómo agregar un test, gotchas) en
 - **Validación en el borde con zod**: schema en `validators/`, aplicado por
   `middleware/validate.js`, que **reemplaza `req.body`** con los datos ya
   convertidos — un handler nunca ve un string donde espera un número.
+- **Un campo nuevo de `businesses` se toca en TRES lugares**: el schema de
+  `validators/`, la lista blanca `TENANT_FIELDS` del repo, y el destructurado del
+  handler de `/api/settings`. Si falta uno, el guardado responde 200 **sin guardar
+  ese campo**. Pasó dos veces (`menu_scale` y después `promos_enabled`, la segunda
+  con el comentario de advertencia ya escrito al lado), así que dejó de depender de
+  acordarse: el test *"cada campo de Configuración se guarda de verdad"* manda
+  todos los campos y verifica que cada uno llegó a la base. Agregar el campo nuevo
+  a ese test es parte del trabajo.
+- **Datos dentro de una página: `jsonInline`, nunca `JSON.stringify` a secas.**
+  `JSON.stringify` no escapa `<` ni la comilla simple, y de eso salieron dos bugs
+  reales: un producto llamado `</script><img src=x onerror=…>` cerraba el script
+  del menú, y una descripción con `pico e' gallo` cortaba un atributo
+  `onclick='…'` y dejaba el botón Editar sin funcionar. Su contrato pide atributos
+  con **comilla simple** (no escapa las dobles, que son estructurales).
+- **Agregar una paleta, un skin o una escala: sólo en `theme/`.** El validador, la
+  vista de configuración y el menú leen de ahí. Esa lista estuvo escrita tres
+  veces y se desincronizó —el panel ofrecía `navy` y el validador aceptaba `blue`,
+  así que la quinta paleta devolvía 400—; hoy `tests/unit/theme.test.js` falla si
+  el validador y el registro no coinciden.
+- **Un skin nuevo** va en `views/menu/`, se declara en `theme/templates.js` y trae
+  sólo dos cosas: su `<style>` y su `window.SKIN` (`contenedorProductos` y
+  `tarjetaProducto`). Todo el chrome —banner, nav, buscador, modales, footer, FAB,
+  popup del flyer— es del armazón (`views/menu.ejs`). **Y lo que el chrome usa se
+  declara en el chrome**: `.product-price-old` y `.promo-badge` viven en el
+  armazón porque el modal de producto las usa. La plantilla la resuelve el
+  ROUTER con `plantillaOPorDefecto`, nunca la vista con el valor de la columna:
+  el armazón hace `include('menu/' + plantilla)`.
+- **Nada que dependa de la fecha lee el reloj adentro.** El router calcula
+  `promos.hoyEn(config.zonaHoraria)` y lo inyecta; `services/promos.js` es puro.
+  Un `new Date()` adentro haría que un test de "promo de martes" pase hoy y falle
+  el jueves. La zona es la del negocio (`America/Bogota`), no la del servidor: en
+  UTC, "hoy" cambia a las 7 de la tarde hora Colombia. Y ojo con las columnas
+  `DATE`: **mysql2 las devuelve como un `Date` a medianoche local**, así que
+  `toISOString()` corre la fecha un día en cualquier servidor al este de
+  Greenwich — usar `promos.aFechaTexto`.
 
 ## Relación con `cargar-menu-pdf`
 
