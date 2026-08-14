@@ -384,11 +384,16 @@ function openProductModal(p) {
   const pmPrice = document.getElementById('pmPrice');
   pmPrice.textContent = '';
   if (p.promo) {
-    const viejo = document.createElement('span');
-    viejo.className = 'product-price-old';
-    viejo.textContent = formatPrice(p.price);
-    pmPrice.appendChild(viejo);
-    pmPrice.appendChild(document.createTextNode(formatPrice(p.promo.price)));
+    // Sin precio promocional (un 2x1) no hay nada que tachar.
+    if (p.promo.price !== null) {
+      const viejo = document.createElement('span');
+      viejo.className = 'product-price-old';
+      viejo.textContent = formatPrice(p.price);
+      pmPrice.appendChild(viejo);
+    }
+    pmPrice.appendChild(document.createTextNode(
+      formatPrice(p.promo.price !== null ? p.promo.price : p.price)
+    ));
     if (p.promo.label) {
       const badge = document.createElement('span');
       badge.className = 'promo-badge';
@@ -400,7 +405,7 @@ function openProductModal(p) {
   }
 
   document.getElementById('pmFooter').textContent =
-    'Precio: ' + formatPrice(p.promo ? p.promo.price : p.price);
+    'Precio: ' + formatPrice(p.promo && p.promo.price !== null ? p.promo.price : p.price);
   document.getElementById('productModal').classList.add('open');
 }
 

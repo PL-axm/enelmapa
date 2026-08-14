@@ -11,14 +11,17 @@ const { ForbiddenError } = require('../errors');
 // null y acá se respeta ese null.
 function camposDePromo(promo) {
   const p = promo || {};
-  const tienePromo = p.promo_price !== null && p.promo_price !== undefined;
+  // Mismo criterio que el validador y que services/promos.js: hay promoción con
+  // precio O con etiqueta. Un "2x1" no baja el precio unitario.
+  const hay = (p.promo_price !== null && p.promo_price !== undefined)
+    || (p.promo_label || '') !== '';
 
   return {
-    promo_price: tienePromo ? p.promo_price : null,
-    promo_label: tienePromo ? (p.promo_label || '') : '',
-    promo_from: tienePromo ? (p.promo_from || null) : null,
-    promo_to: tienePromo ? (p.promo_to || null) : null,
-    promo_days: tienePromo ? (p.promo_days || '1111111') : '1111111'
+    promo_price: hay ? (p.promo_price ?? null) : null,
+    promo_label: hay ? (p.promo_label || '') : '',
+    promo_from: hay ? (p.promo_from || null) : null,
+    promo_to: hay ? (p.promo_to || null) : null,
+    promo_days: hay ? (p.promo_days || '1111111') : '1111111'
   };
 }
 

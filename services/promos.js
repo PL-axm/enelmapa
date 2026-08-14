@@ -75,8 +75,17 @@ const FUERA_DE_DIA = 'fuera-de-dia';
 // Devuelve UNO de los cinco estados. Que sean estados y no un booleano es lo que
 // permite mostrarle al dueño por qué su promo no se ve: cargarla y que no
 // aparezca sin explicación es el reclamo garantizado.
+// Hay promoción si hay precio promocional O si hay etiqueta. Un "2x1" no baja el
+// precio unitario —cambia lo que te dan— así que exigir precio dejaba afuera el
+// caso más común de promoción de restaurante.
+function tienePromo(producto) {
+  const conPrecio = producto.promo_price !== null && producto.promo_price !== undefined;
+  const conEtiqueta = (producto.promo_label || '') !== '';
+  return conPrecio || conEtiqueta;
+}
+
 function estado(producto, hoy) {
-  if (producto.promo_price === null || producto.promo_price === undefined) return SIN_PROMO;
+  if (!tienePromo(producto)) return SIN_PROMO;
 
   const desde = aFechaTexto(producto.promo_from);
   const hasta = aFechaTexto(producto.promo_to);
@@ -107,6 +116,7 @@ function etiqueta(estadoId) {
 }
 
 module.exports = {
+  tienePromo,
   hoyEn,
   aFechaTexto,
   diasNormalizados,

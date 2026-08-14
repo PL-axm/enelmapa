@@ -119,10 +119,36 @@ const diasPromo = z
     }
   });
 
+// Hay promoción si hay precio promocional O si hay etiqueta. Las dos formas son
+// legítimas y la segunda faltaba:
+//
+//   * "$25.000 -> $18.000"  : baja el precio. Precio, con o sin etiqueta.
+//   * "2x1", "Martes de alitas": el precio unitario NO cambia, lo que cambia es
+//     lo que te dan. Sólo etiqueta.
+//
+// La primera versión exigía precio promocional siempre, así que un 2x1 —que es
+// de lo primero que pide un restaurante— era imposible de cargar.
+function tienePromo(datos) {
+  return datos.promo_price !== null || (datos.promo_label || '') !== '';
+}
+
 // Las reglas que cruzan campos, aplicadas al objeto entero. Van en un helper
 // porque valen igual para crear y para editar un producto.
 function refinarPromo(datos, ctx) {
-  if (datos.promo_price === null) return;
+  if (!tienePromo(datos)) return;
+
+  if (datos.promo_price === null) {
+    // Promo de sólo etiqueta: no hay precio que comparar, pero las fechas sí se
+    // validan igual.
+    if (datos.promo_from && datos.promo_to && datos.promo_from > datos.promo_to) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['promo_to'],
+        message: 'La fecha de fin no puede ser anterior a la de inicio'
+      });
+    }
+    return;
+  }
 
   // Una promo más cara que el precio normal es un error de carga, y si se guarda
   // el menú muestra un tachado absurdo: "$20.000" tachado y "$25.000" al lado.
@@ -143,12 +169,12 @@ function refinarPromo(datos, ctx) {
   }
 }
 
-// Sin precio promocional, el resto de los campos de promo no significan nada.
-// Se limpian en vez de guardarse: una ventana de fechas sin precio es basura que
-// después nadie sabe interpretar, y peor, reaparece si alguien vuelve a poner un
-// precio sin mirar las fechas viejas.
+// Sin precio Y sin etiqueta no hay promoción, así que el resto de los campos no
+// significan nada y se limpian en vez de guardarse: una ventana de fechas sin
+// promo es basura que después nadie sabe interpretar, y peor, reaparece si alguien
+// vuelve a poner un precio sin mirar las fechas viejas.
 function limpiarPromoVacia(datos) {
-  if (datos.promo_price === null) {
+  if (!tienePromo(datos)) {
     return { ...datos, promo_label: '', promo_from: null, promo_to: null, promo_days: '1111111' };
   }
   return datos;

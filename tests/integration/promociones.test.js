@@ -128,11 +128,13 @@ describe('promociones', () => {
       expect((await leerProducto(res.body.id)).promo_price).toBeNull();
     });
 
-    test('sin promo también se limpian etiqueta, fechas y días', async () => {
+    test('sin precio Y sin etiqueta se limpian fechas y días', async () => {
+      // Sin ninguna de las dos no hay promoción, y una ventana de fechas suelta es
+      // basura que después nadie interpreta.
       const res = await agent.post('/api/products').type('form').send({
         ...productoBase(),
         promo_price: '',
-        promo_label: 'que no quede',
+        promo_label: '',
         promo_from: '2026-09-01',
         promo_to: '2026-09-30',
         promo_days: '0010000'
@@ -143,6 +145,39 @@ describe('promociones', () => {
       expect(p.promo_label).toBe('');
       expect(p.promo_from).toBeNull();
       expect(p.promo_to).toBeNull();
+      expect(p.promo_days).toBe('1111111');
+    });
+
+    // Un 2x1 no baja el precio unitario: cambia lo que te dan. Exigir precio
+    // promocional hacía imposible cargar la promoción más común de un restaurante.
+    test('una promo de SÓLO etiqueta se guarda y conserva su vigencia', async () => {
+      const res = await agent.post('/api/products').type('form').send({
+        ...productoBase(),
+        promo_price: '',
+        promo_label: '2x1',
+        promo_from: '2026-09-01',
+        promo_to: '2026-09-30',
+        promo_days: '0010000'
+      });
+
+      expect(res.status).toBe(200);
+      const p = await leerProducto(res.body.id);
+      expect(p.promo_price).toBeNull();
+      expect(p.promo_label).toBe('2x1');
+      expect(p.promo_days).toBe('0010000');
+      expect(p.promo_from.getDate()).toBe(1);
+    });
+
+    test('la etiqueta sola también se puede quitar', async () => {
+      const creado = await agent.post('/api/products').type('form')
+        .send({ ...productoBase(), promo_price: '', promo_label: '2x1' });
+
+      await agent.put('/api/products/' + creado.body.id).type('form')
+        .send({ ...productoBase(), promo_price: '', promo_label: '' });
+
+      const p = await leerProducto(creado.body.id);
+      expect(p.promo_label).toBe('');
+      expect(p.promo_price).toBeNull();
     });
 
     test('guarda los cinco campos juntos', async () => {
@@ -456,6 +491,31 @@ describe('la sección de promociones en el menú', () => {
     expect(Number(p.price)).toBe(20000);
     expect(Number(p.promo.price)).toBe(15000);
     expect(p.promo.label).toBe('-25%');
+  });
+
+  test('una promo de sólo etiqueta llega al menú sin tachado', async () => {
+    // El 2x1 en el menú: entra en la sección, muestra el badge, y el precio queda
+    // como está — no hay nada que tachar.
+    await agent.post('/api/products').type('form').send({
+      name: 'Alitas', description: '', price: '30000',
+      category_id: String(business.categoryId),
+      promo_price: '', promo_label: '2x1'
+    });
+    await encender();
+
+    const data = datosDelMenu((await request(app).get('/s/test-seccion')).text);
+    const p = data.promos.products.find(x => x.name === 'Alitas');
+
+    expect(p).toBeDefined();
+    expect(p.promo).toEqual({ price: null, label: '2x1' });
+    expect(Number(p.price)).toBe(30000);
+  });
+
+  test('los skins no tachan nada cuando la promo no tiene precio', async () => {
+    const res = await request(app).get('/s/test-seccion');
+
+    // La guarda está en los dos skins y en el modal del armazón.
+    expect(res.text).toContain('p.promo.price !== null');
   });
 
   test('una etiqueta con HTML no puede inyectar', async () => {

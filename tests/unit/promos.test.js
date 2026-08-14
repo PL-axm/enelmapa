@@ -169,3 +169,38 @@ describe('hoyEn', () => {
     expect(promos.hoyEn('UTC', new Date('2026-09-19T12:00:00Z')).dia).toBe(6);
   });
 });
+
+// Un 2x1 no baja el precio unitario: lo que cambia es lo que te dan. La primera
+// versión exigía precio promocional, así que la promoción más común de un
+// restaurante no se podía cargar.
+describe('promos de sólo etiqueta', () => {
+  const MARTES = { fecha: '2026-09-15', dia: 2 };
+
+  test('con etiqueta y sin precio hay promoción', () => {
+    const p = { promo_price: null, promo_label: '2x1', promo_days: '1111111' };
+
+    expect(promos.tienePromo(p)).toBe(true);
+    expect(promos.estado(p, MARTES)).toBe(ESTADOS.ACTIVA);
+  });
+
+  test('sin etiqueta y sin precio no hay promoción', () => {
+    expect(promos.tienePromo({ promo_price: null, promo_label: '' })).toBe(false);
+    expect(promos.estado({ promo_price: null, promo_label: '' }, MARTES)).toBe(ESTADOS.SIN_PROMO);
+  });
+
+  test('la vigencia se aplica igual a una promo de sólo etiqueta', () => {
+    const soloMartes = { promo_price: null, promo_label: '2x1', promo_days: '0010000' };
+    expect(promos.estado(soloMartes, MARTES)).toBe(ESTADOS.ACTIVA);
+    expect(promos.estado(soloMartes, { fecha: '2026-09-16', dia: 3 })).toBe(ESTADOS.FUERA_DE_DIA);
+
+    const vencida = { promo_price: null, promo_label: '2x1', promo_to: '2026-09-01' };
+    expect(promos.estado(vencida, MARTES)).toBe(ESTADOS.VENCIDA);
+  });
+
+  test('con precio y con etiqueta también, que es el caso de "-30%"', () => {
+    const p = { promo_price: '14000.00', promo_label: '-30%', promo_days: '1111111' };
+
+    expect(promos.tienePromo(p)).toBe(true);
+    expect(promos.estado(p, MARTES)).toBe(ESTADOS.ACTIVA);
+  });
+});

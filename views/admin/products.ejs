@@ -25,17 +25,24 @@
             <td><strong><%= p.name %></strong><br><span style="font-size:12px;color:#9C9889"><%= p.description || '' %></span></td>
             <td><%= p.category_name %></td>
             <td style="font-weight:600;color:#C8956C">
-              <% if (p.promo_price !== null && p.promo_price !== undefined) { %>
+              <%# La condición es "tiene promo", no "tiene precio promocional": un
+                  2x1 es una promoción sin cambio de precio, y con la condición
+                  vieja no se veía ni su etiqueta ni su estado en esta lista. %>
+              <% var conPrecioPromo = p.promo_price !== null && p.promo_price !== undefined; %>
+              <% if (conPrecioPromo) { %>
                 <span style="text-decoration:line-through;color:#9C9889;font-weight:400">$ <%= Math.round(p.price).toLocaleString('es-CO') %></span><br>
                 $ <%= Math.round(p.promo_price).toLocaleString('es-CO') %>
-                <% var et = etiquetaPromo(p.promoEstado); %>
-                <%# El estado es lo que evita el reclamo "cargué la promo y no se ve":
-                    programada, vencida o fuera de día se dicen, no se adivinan. %>
-                <% if (et) { %>
-                  <br><span style="font-size:10px;font-weight:600;color:<%= et.color %>"><%= et.texto %></span>
-                <% } %>
               <% } else { %>
                 $ <%= Math.round(p.price).toLocaleString('es-CO') %>
+              <% } %>
+              <% if (p.promo_label) { %>
+                <br><span style="font-size:10px;font-weight:600;border:1px solid #C8956C;border-radius:20px;padding:1px 6px"><%= p.promo_label %></span>
+              <% } %>
+              <% var et = etiquetaPromo(p.promoEstado); %>
+              <%# El estado es lo que evita el reclamo "cargué la promo y no se ve":
+                  programada, vencida o fuera de día se dicen, no se adivinan. %>
+              <% if (et) { %>
+                <br><span style="font-size:10px;font-weight:600;color:<%= et.color %>"><%= et.texto %></span>
               <% } %>
             </td>
             <td>
@@ -91,43 +98,64 @@
       </div>
 
       <%# === Promoción ===
-          El precio promocional es el interruptor: vacío significa sin promoción, y
-          al guardar vacío se limpian también la etiqueta, las fechas y los días.
-          Los demás campos quedan escondidos hasta que haya un precio, para que el
-          formulario no muestre cinco cosas que no hacen nada. %>
+          Nada se esconde. La primera versión mostraba sólo el precio promocional y
+          revelaba el resto al escribirlo, para no llenar el formulario de campos
+          inertes; el resultado fue que nadie encontraba la etiqueta y no había forma
+          de descubrir que se podía cargar un "2x1".
+
+          Hay promoción con precio, con etiqueta, o con las dos:
+            - baja de precio  -> precio promocional (el tachado sale solo)
+            - 2x1, "martes de alitas" -> sólo etiqueta; el precio unitario no cambia
+          Vacíos los dos, no hay promoción y se limpian fechas y días. %>
       <fieldset style="border:1px solid #E8E5DE;border-radius:8px;padding:14px;margin-bottom:16px">
         <legend style="font-size:13px;font-weight:600;color:#6B6860;padding:0 6px">Promoción</legend>
+        <p style="font-size:12px;color:#6B6860;margin:0 0 14px">
+          Podés bajar el precio, poner una etiqueta como <strong>2x1</strong>, o las dos cosas.
+          Dejá todo vacío para que el producto no tenga promoción.
+        </p>
 
         <div class="form-group">
-          <label>Precio promocional (COP) <span style="font-weight:400;color:#9C9889">— vacío = sin promoción</span></label>
-          <input type="number" id="promoPrice" min="0" placeholder="Sin promoción">
+          <label>Etiqueta <span style="font-weight:400;color:#9C9889">— lo que ve el cliente en el menú</span></label>
+          <input type="text" id="promoLabel" maxlength="40" placeholder="2x1">
+          <%# Atajos con los casos que más se piden. Escriben la etiqueta y, cuando
+              corresponde, calculan el precio: un "-30%" que obliga al dueño a sacar
+              el 30% con la calculadora es una invitación a equivocarse. %>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+            <button type="button" class="btn btn-secondary btn-sm" data-etiqueta="2x1">2x1</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-descuento="10">-10%</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-descuento="20">-20%</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-descuento="30">-30%</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-descuento="50">-50%</button>
+          </div>
         </div>
 
-        <div id="promoDetalle" style="display:none">
-          <div class="form-group">
-            <label>Etiqueta <span style="font-weight:400;color:#9C9889">— opcional, ej: 2x1, -30%</span></label>
-            <input type="text" id="promoLabel" maxlength="40" placeholder="">
-          </div>
+        <div class="form-group">
+          <label>Precio promocional (COP) <span style="font-weight:400;color:#9C9889">— opcional; vacío deja el precio normal</span></label>
+          <input type="number" id="promoPrice" min="0" placeholder="Sin cambio de precio">
+          <p style="font-size:11px;color:#9C9889;margin-top:6px" id="promoAyudaPrecio">
+            Tiene que ser menor que el precio normal. Si lo llenás, el menú muestra el precio
+            viejo tachado.
+          </p>
+        </div>
 
-          <div class="form-group">
-            <label>Vigencia</label>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-              <button type="button" class="btn btn-secondary btn-sm" data-preset="fija">Fija</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-preset="semana">Esta semana</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-preset="mes">Este mes</button>
-            </div>
-            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-              <label style="font-size:12px;color:#6B6860">Desde <input type="date" id="promoFrom"></label>
-              <label style="font-size:12px;color:#6B6860">Hasta <input type="date" id="promoTo"></label>
-            </div>
-            <p style="font-size:11px;color:#9C9889;margin-top:6px">Sin fechas, la promoción no vence.</p>
+        <div class="form-group">
+          <label>Vigencia</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+            <button type="button" class="btn btn-secondary btn-sm" data-preset="fija">Fija</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-preset="semana">Esta semana</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-preset="mes">Este mes</button>
           </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <label style="font-size:12px;color:#6B6860">Desde <input type="date" id="promoFrom"></label>
+            <label style="font-size:12px;color:#6B6860">Hasta <input type="date" id="promoTo"></label>
+          </div>
+          <p style="font-size:11px;color:#9C9889;margin-top:6px">Sin fechas, la promoción no vence.</p>
+        </div>
 
-          <div class="form-group">
-            <label>Días de la semana</label>
-            <div id="promoDias" style="display:flex;gap:6px;flex-wrap:wrap"></div>
-            <p style="font-size:11px;color:#9C9889;margin-top:6px">Tiene que quedar al menos uno marcado.</p>
-          </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Días de la semana</label>
+          <div id="promoDias" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+          <p style="font-size:11px;color:#9C9889;margin-top:6px">Tiene que quedar al menos uno marcado.</p>
         </div>
       </fieldset>
 
@@ -236,18 +264,39 @@ function cargarPromo(p) {
     chk.checked = dias[i] === '1';
   });
 
-  mostrarDetallePromo();
 }
 
-// El detalle sólo aparece cuando hay un precio promocional: sin él, la etiqueta,
-// las fechas y los días no hacen nada, y mostrarlos invita a llenarlos para
-// después descubrir que no se guardó.
-function mostrarDetallePromo() {
-  var hay = document.getElementById('promoPrice').value !== '';
-  document.getElementById('promoDetalle').style.display = hay ? '' : 'none';
-}
+// Atajos de etiqueta. "2x1" es sólo etiqueta —el precio unitario no cambia—, y los
+// de porcentaje además CALCULAN el precio promocional a partir del precio normal:
+// hacerle sacar el 30% con la calculadora al dueño es una invitación a equivocarse,
+// y un precio promocional mayor al normal lo rechaza el servidor.
+document.querySelectorAll('[data-etiqueta], [data-descuento]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var etiqueta = document.getElementById('promoLabel');
+    var precioPromo = document.getElementById('promoPrice');
 
-document.getElementById('promoPrice').addEventListener('input', mostrarDetallePromo);
+    if (this.dataset.etiqueta) {
+      etiqueta.value = this.dataset.etiqueta;
+      // Un 2x1 no cambia el precio unitario, así que se limpia: si quedara un
+      // precio de un atajo anterior, el menú mostraría un tachado que no
+      // corresponde.
+      precioPromo.value = '';
+      return;
+    }
+
+    var pct = Number(this.dataset.descuento);
+    etiqueta.value = '-' + pct + '%';
+
+    var normal = Number(document.getElementById('prodPrice').value);
+    if (!Number.isFinite(normal) || normal <= 0) {
+      precioPromo.value = '';
+      return;
+    }
+    // Se redondea a la unidad: en pesos colombianos no existen los centavos y un
+    // "$ 13.999,99" en el menú se lee como un error.
+    precioPromo.value = Math.round(normal * (100 - pct) / 100);
+  });
+});
 
 // Los atajos de vigencia. Se calculan en el navegador, con la fecha del usuario:
 // es sólo para llenar los dos campos, y lo que decide si la promo está vigente

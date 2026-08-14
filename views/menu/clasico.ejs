@@ -106,12 +106,19 @@
       if (p.promo) {
         // Tachado + promocional + etiqueta. Todo con `textContent` sobre nodos
         // creados a mano: `p.promo.label` lo escribe el dueño del negocio.
-        var viejo = document.createElement('span');
-        viejo.className = 'product-price-old';
-        viejo.textContent = helpers.formatPrice(p.price);
-        price.appendChild(viejo);
+        //
+        // Sin precio promocional —una promo de sólo etiqueta, como un 2x1— no hay
+        // nada que tachar: se muestra el precio normal y el badge al lado.
+        if (p.promo.price !== null) {
+          var viejo = document.createElement('span');
+          viejo.className = 'product-price-old';
+          viejo.textContent = helpers.formatPrice(p.price);
+          price.appendChild(viejo);
+        }
 
-        price.appendChild(document.createTextNode(helpers.formatPrice(p.promo.price)));
+        price.appendChild(document.createTextNode(
+          helpers.formatPrice(p.promo.price !== null ? p.promo.price : p.price)
+        ));
 
         if (p.promo.label) {
           var badge = document.createElement('span');
