@@ -291,7 +291,7 @@
 <%# El flyer de promociones, como aviso encima del menú. Sólo con las promociones
     encendidas, porque es una promoción: el mismo interruptor que la sección. %>
 <% if (business.promos_enabled && business.promo_flyer) { %>
-  <div class="flyer-popup" id="flyerPopup" data-flyer="<%= business.promo_flyer %>">
+  <div class="flyer-popup" id="flyerPopup">
     <div class="flyer-popup-fondo" data-cerrar-flyer></div>
     <div class="flyer-popup-caja">
       <button class="flyer-popup-cerrar" type="button" data-cerrar-flyer aria-label="Cerrar aviso">
@@ -313,25 +313,22 @@
     (function () {
       var popup = document.getElementById('flyerPopup');
 
-      // La clave incluye la URL de la imagen, así que si el negocio CAMBIA el
-      // flyer, quien ya había cerrado el anterior ve el nuevo. Con una clave fija
-      // —un simple "flyer-visto"— el que cerró un aviso una vez no volvería a ver
-      // ninguna promoción nunca más en esa pestaña.
-      var clave = 'flyer:' + popup.dataset.flyer;
-
-      // sessionStorage y no localStorage: se muestra una vez por visita, no una
-      // vez en la vida. Y en un try/catch porque en modo privado de algunos
-      // navegadores el simple acceso lanza — sin esto, una excepción acá cortaría
-      // el script y el menú quedaría sin promociones ni aviso.
-      var yaVisto = false;
-      try { yaVisto = sessionStorage.getItem(clave) === '1'; } catch (e) {}
-
-      if (yaVisto) return;
+      // Se muestra en CADA carga del menú, no una vez por visita.
+      //
+      // La primera versión lo recordaba en `sessionStorage` para no repetirlo al
+      // recargar. Suena considerado y en la práctica molesta: quien cierra el
+      // aviso y refresca cree que algo se rompió, y el negocio que armó la lámina
+      // quiere que se vea. Un menú se abre y se cierra, no se navega, así que
+      // "cada carga" es casi siempre "una vez" igual.
+      //
+      // Si alguna vez hay que no repetirlo, la forma correcta es una clave de
+      // sessionStorage que INCLUYA la URL de la imagen —así un flyer nuevo se
+      // vuelve a mostrar—, envuelta en try/catch porque en modo privado el solo
+      // acceso lanza en algunos navegadores.
       popup.classList.add('open');
 
       function cerrar() {
         popup.classList.remove('open');
-        try { sessionStorage.setItem(clave, '1'); } catch (e) {}
         document.removeEventListener('keydown', alEscape);
       }
 

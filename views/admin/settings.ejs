@@ -175,8 +175,7 @@
     <% } %>
     <% if (business.promo_flyer) { %>
       <p style="font-size:11px;color:#9C9889;margin-top:8px">
-        Se le muestra una vez por visita a cada cliente. Si lo cambiás por otro, quien ya
-        había visto el anterior verá el nuevo.
+        Aparece cada vez que un cliente abre tu menú, y se cierra con la X.
       </p>
     <% } %>
   </div>
@@ -243,7 +242,13 @@
   <% }) %>
 </div>
 
-<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px">
+<%# El aviso de "guardado" también acá, JUNTO AL BOTÓN. El de arriba está en la
+    línea 3 de una página de 280: al guardar, el usuario está mirando el final del
+    formulario y el mensaje aparecía fuera de la pantalla — se mostraba y nadie lo
+    veía nunca. Se dejan los dos: quien guardó con el scroll arriba ve ese, y quien
+    guardó desde el botón ve este. %>
+<div style="display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:20px">
+  <div id="saveAlertAbajo" class="alert alert-success" style="display:none;margin-bottom:0">Cambios guardados correctamente</div>
   <a href="/s/<%= session.businessSlug %>" target="_blank" class="btn btn-secondary">Ver menú</a>
   <button type="submit" class="btn btn-primary">Guardar cambios</button>
 </div>
@@ -270,8 +275,14 @@ document.getElementById('settingsForm').addEventListener('submit', async functio
   // recargar le haría perder el scroll en un formulario largo. Sólo se
   // confirma; si falla, apiFetch deja el error arriba.
   if (await apiFetch('/api/settings', { method: 'POST', body: fd })) {
-    document.getElementById('saveAlert').style.display = '';
-    setTimeout(function() { document.getElementById('saveAlert').style.display = 'none'; }, 3000);
+    // Los dos avisos, arriba y junto al botón: no se sabe con qué scroll estaba
+    // mirando quien guardó. 4 segundos y no 3: con 3 alcanzaba a desaparecer
+    // antes de que el ojo volviera al mensaje.
+    var avisos = [document.getElementById('saveAlert'), document.getElementById('saveAlertAbajo')];
+    avisos.forEach(function (a) { if (a) a.style.display = ''; });
+    setTimeout(function () {
+      avisos.forEach(function (a) { if (a) a.style.display = 'none'; });
+    }, 4000);
   }
 });
 </script>
