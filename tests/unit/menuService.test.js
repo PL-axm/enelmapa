@@ -117,7 +117,7 @@ describe('menuService.buildMenu — promociones', () => {
   test('la sección junta los productos con promo vigente', () => {
     const res = armar([conPromo(10, 1), prod(11, 1), conPromo(20, 2)]);
 
-    expect(res.promos.name).toBe('Promociones');
+    expect(res.promos.name).toBe(menuService.NOMBRE_SECCION_PROMOS);
     expect(res.promos.products.map(p => p.id)).toEqual([10, 20]);
   });
 

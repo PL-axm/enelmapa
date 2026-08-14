@@ -10,7 +10,16 @@ const promos = require('./promos');
 // un `new Date()`, un test de "promo de martes" pasaría hoy y fallaría el
 // jueves.
 
-const NOMBRE_SECCION_PROMOS = 'Promociones';
+// En MAYÚSCULAS porque las categorías de los negocios suelen estar así —"ENTRADAS
+// 🥞", "BOWLS CLÁSICOS 🍜"— y al lado "Promociones" se veía en minúsculas.
+//
+// La alternativa era un `text-transform: uppercase` en `.category-title`, y es
+// peor: las categorías están en mayúsculas porque el DUEÑO las escribió así, no
+// por CSS, así que transformarlas cambiaría cómo se ven las de todos los
+// negocios, incluidos los que las escribieron en mixto a propósito (CAFICULTOR
+// tiene "Desayunos & Brunch 🥞"). Esta sección es la única cuyo nombre elegimos
+// nosotros, así que se escribe como se quiere ver.
+const NOMBRE_SECCION_PROMOS = 'PROMOCIONES';
 
 function menuService() {
   // La forma en que la vista consume un producto. Se arma en un solo lugar

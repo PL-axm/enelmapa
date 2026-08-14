@@ -231,6 +231,10 @@ const schemas = {
     menu_theme: z.enum(tema.idsDePaletas()).optional().default(tema.PALETA_POR_DEFECTO),
     menu_scale: z.enum(tema.idsDeEscalas()).optional().default(tema.ESCALA_POR_DEFECTO),
     promos_enabled: checkbox,
+    // El flyer se reemplaza subiendo otro, pero también tiene que poder QUITARSE:
+    // la promoción termina y la lámina baja. Banner y logo hoy sólo se pueden
+    // reemplazar, y para ellos alcanza; para un flyer no.
+    quitar_flyer: checkbox,
     hours: horarios
   }),
 

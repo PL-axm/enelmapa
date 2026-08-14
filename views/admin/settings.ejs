@@ -100,6 +100,31 @@
       <span class="toggle-slider"></span>
     </label>
   </label>
+
+  <%# El flyer: una imagen sola, para el negocio que prefiere anunciar con su
+      propia lámina en vez de con precios tachados. Va arriba del menú y sólo se
+      ve con las promociones encendidas, porque es una promoción.
+
+      La casilla de quitar existe porque el flyer TIENE que poder bajarse: la
+      promoción termina. Banner y logo sólo se pueden reemplazar, y para ellos
+      alcanza; para esto no. %>
+  <div class="form-group" style="margin-top:20px">
+    <label>Flyer de promociones <span style="font-weight:400;color:#9C9889">— opcional, se muestra arriba de tu menú</span></label>
+    <input type="file" name="flyer" id="flyerInput" accept="image/*">
+    <% if (business.promo_flyer) { %>
+      <img src="<%= business.promo_flyer %>" alt="Flyer actual" style="display:block;max-width:100%;margin-top:10px;border-radius:8px;border:1px solid #E8E5DE">
+      <%# `width:auto` explícito: el CSS del panel tiene
+          `.form-group input { width: 100% }`, pensado para los campos de texto, y
+          sobre una casilla la estira a todo el ancho — la casilla queda centrada y
+          su texto empujado al otro extremo. %>
+      <label style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:#6B6860;cursor:pointer">
+        <input type="checkbox" name="quitar_flyer" id="quitarFlyer" style="width:auto;flex:0 0 auto;margin:0">
+        Quitar el flyer
+      </label>
+    <% } else { %>
+      <p style="font-size:12px;color:#9C9889;margin-top:6px">Todavía no cargaste ningún flyer.</p>
+    <% } %>
+  </div>
   <script>
     document.querySelectorAll('input[name="menu_scale"]').forEach(function (r) {
       r.addEventListener('change', function () {
