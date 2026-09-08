@@ -44,6 +44,47 @@
 </div>
 
 <div class="card">
+  <h3>Ubicaciones</h3>
+  <p style="font-size:13px;color:#6B6860;margin-bottom:16px">Administra las ubicaciones de tu negocio</p>
+  <div id="locationsList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+    <% locations.forEach(function(loc) { %>
+      <div class="location-item" data-location-id="<%= loc.id %>" style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:#FAFAF7;border-radius:8px;border-left:4px solid <%= loc.is_primary ? '#C8956C' : '#E8E5DE' %>">
+        <div>
+          <div style="font-weight:600;font-size:14px"><%= loc.address %></div>
+          <% if (loc.is_primary) { %>
+            <span style="font-size:11px;background:#C8956C;color:#fff;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">Principal</span>
+          <% } %>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn-edit-location" data-location-id="<%= loc.id %>" style="padding:6px 12px;font-size:12px;background:#E8E5DE;border:none;border-radius:6px;cursor:pointer">Editar</button>
+          <button type="button" class="btn-delete-location" data-location-id="<%= loc.id %>" style="padding:6px 12px;font-size:12px;background:#FFE0E0;border:none;border-radius:6px;cursor:pointer;color:#C84040">Quitar</button>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+  <button type="button" id="btnAddLocation" style="padding:10px 16px;background:#C8956C;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">+ Agregar ubicación</button>
+</div>
+
+<!-- Modal para agregar/editar ubicación -->
+<div id="locationModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:400px">
+    <h3 style="margin-top:0">Agregar ubicación</h3>
+    <div class="form-group">
+      <label>Dirección</label>
+      <input type="text" id="locationAddress" placeholder="Ej: Primavera Life Mall - Local 109" required>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="locationIsPrimary">
+      <span>Marcar como principal</span>
+    </label>
+    <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end">
+      <button type="button" id="btnCloseLocationModal" style="padding:10px 16px;background:#E8E5DE;border:none;border-radius:6px;cursor:pointer">Cancelar</button>
+      <button type="button" id="btnSaveLocation" style="padding:10px 16px;background:#C8956C;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="card">
   <%# El diseño (layout) es un eje aparte del color y del tamaño: cualquier
       combinación de los tres es válida, y por eso son tres selectores y no una
       lista de "estilos" predefinidos.
@@ -284,6 +325,79 @@ document.getElementById('settingsForm').addEventListener('submit', async functio
       avisos.forEach(function (a) { if (a) a.style.display = 'none'; });
     }, 4000);
   }
+});
+
+// === UBICACIONES ===
+var editingLocationId = null;
+
+function showLocationModal() {
+  editingLocationId = null;
+  document.getElementById('locationAddress').value = '';
+  document.getElementById('locationIsPrimary').checked = false;
+  document.querySelector('#locationModal h3').textContent = 'Agregar ubicación';
+  document.getElementById('locationModal').style.display = 'flex';
+}
+
+function closeLocationModal() {
+  document.getElementById('locationModal').style.display = 'none';
+  editingLocationId = null;
+}
+
+async function saveLocation() {
+  var address = document.getElementById('locationAddress').value.trim();
+  var isPrimary = document.getElementById('locationIsPrimary').checked;
+
+  if (!address) {
+    alert('La dirección no puede estar vacía');
+    return;
+  }
+
+  var method, url;
+  if (editingLocationId) {
+    method = 'PUT';
+    url = '/api/locations/' + editingLocationId;
+  } else {
+    method = 'POST';
+    url = '/api/locations';
+  }
+
+  if (await apiFetch(url, {
+    method: method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address: address, is_primary: isPrimary })
+  })) {
+    closeLocationModal();
+    location.reload();
+  }
+}
+
+async function deleteLocation(locationId) {
+  if (!confirm('¿Está seguro que desea eliminar esta ubicación?')) return;
+
+  if (await apiFetch('/api/locations/' + locationId, { method: 'DELETE' })) {
+    location.reload();
+  }
+}
+
+document.getElementById('btnAddLocation').addEventListener('click', showLocationModal);
+document.getElementById('btnCloseLocationModal').addEventListener('click', closeLocationModal);
+document.getElementById('btnSaveLocation').addEventListener('click', saveLocation);
+
+document.querySelectorAll('.btn-edit-location').forEach(function(btn) {
+  btn.addEventListener('click', async function() {
+    editingLocationId = this.dataset.locationId;
+    var item = document.querySelector('.location-item[data-location-id="' + editingLocationId + '"]');
+    document.getElementById('locationAddress').value = item.querySelector('div div').textContent;
+    document.getElementById('locationIsPrimary').checked = item.querySelector('span') !== null;
+    document.querySelector('#locationModal h3').textContent = 'Editar ubicación';
+    document.getElementById('locationModal').style.display = 'flex';
+  });
+});
+
+document.querySelectorAll('.btn-delete-location').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    deleteLocation(this.dataset.locationId);
+  });
 });
 </script>
 
