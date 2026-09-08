@@ -65,11 +65,13 @@ function createAdminRouter({ repos, services, config }) {
     const scope = repos.businesses.forBusiness(req.session.businessId);
     const business = await scope.get();
     const hours = await scope.hours();
+    const locations = await repos.locations.forBusiness(req.session.businessId).getAll();
 
     res.render('admin/settings', {
       session: req.session,
       business,
       hours,
+      locations,
       // Las opciones de paleta y escala salen de theme/, la misma fuente que
       // valida el POST. Escritas en la vista se desincronizaban.
       paletas: tema.paletasParaUI(),
