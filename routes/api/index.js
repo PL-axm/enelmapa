@@ -189,6 +189,41 @@ function createApiRouter({ repos, services }) {
     res.json({ ok: true });
   }));
 
+  // === LOCATIONS ===
+  router.get('/locations', authRequired, asyncHandler(async (req, res) => {
+    const locations = await repos.locations.forBusiness(req.session.businessId).getAll();
+    res.json({ locations });
+  }));
+
+  router.post('/locations', authRequired, validate(schemas.newLocation), asyncHandler(async (req, res) => {
+    const { address, is_primary } = req.body;
+    const id = await repos.locations.forBusiness(req.session.businessId).create(address, is_primary ? 1 : 0);
+    res.json({ ok: true, id, address, is_primary });
+  }));
+
+  router.put('/locations/:id', authRequired, requireIntParam('id'), validate(schemas.editLocation), asyncHandler(async (req, res) => {
+    const { address, is_primary } = req.body;
+    const afectó = await repos.locations.forBusiness(req.session.businessId).update(req.params.id, {
+      address,
+      isPrimary: is_primary ? 1 : 0
+    });
+    requireAffected(afectó, 'Ubicación no encontrada');
+    res.json({ ok: true });
+  }));
+
+  router.delete('/locations/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
+    try {
+      const afectó = await repos.locations.forBusiness(req.session.businessId).delete(req.params.id);
+      requireAffected(afectó, 'Ubicación no encontrada');
+      res.json({ ok: true });
+    } catch (err) {
+      if (err.message.includes('last location')) {
+        throw new ValidationError('No se puede eliminar la última ubicación. El negocio debe tener al menos una.');
+      }
+      throw err;
+    }
+  }));
+
   // === QR CODE ===
   router.get('/qr', authRequired, asyncHandler(async (req, res) => {
     const business = await repos.businesses.forBusiness(req.session.businessId).get();
