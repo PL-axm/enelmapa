@@ -11,7 +11,7 @@ function createPublicRouter({ services, config }) {
   const router = express.Router();
 
   router.get('*', (req, res) => {
-    const { business, businessHours, categories, products } = req;
+    const { business, businessHours, categories, products, locations } = req;
 
     // La fecha se calcula acá y se inyecta: el servicio es puro y no lee el
     // reloj. `config.zonaHoraria` es la del negocio, no la del servidor — si el
@@ -28,6 +28,7 @@ function createPublicRouter({ services, config }) {
     res.render('menu', {
       business,
       hours: businessHours,
+      locations,
       menuData,
       // El skin se resuelve ACÁ, contra el registro de theme/templates.js, y no
       // en la vista con `business.menu_template` directo: eso último haría que
