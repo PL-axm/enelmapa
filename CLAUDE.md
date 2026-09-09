@@ -187,4 +187,27 @@ Three layers guard it, in `services/imageUpload.js` and `app.js`: multer's `file
 
 ### Deployment
 
-`.htaccess` proxies all requests to a locally running Node process via Passenger (`PASSENGER_BASE_PORT`) — this is a cPanel/Passenger-style deployment, not a standalone container/PM2 setup.
+cPanel + CloudLinux Node.js Selector (mod_passenger), not a container/PM2 setup. Passenger serves the app directly from the `.htaccess` in the app root:
+
+```
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot   "/home/<user>/public_html/enelmapa.co"
+PassengerNodejs    "/home/<user>/nodevenv/public_html/enelmapa.co/22/bin/node"
+PassengerAppType   node
+PassengerStartupFile server.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+```
+
+**That file is gitignored, and must stay that way.** It carries the Passenger block *and* the app's environment variables, which cPanel writes into it — and since nothing here loads `dotenv`, it is the **only** source of `process.env` in production. The `.env` sitting in the app directory is a leftover that Node never reads.
+
+The repo used to track a 177-byte `.htaccess` holding a `RewriteRule` to `127.0.0.1:%{ENV:PASSENGER_BASE_PORT}` — a different architecture (Passenger standalone on a port) that this deployment does not use. Every `git pull` overwrote the real file with it, so Passenger never got told what the app was: no app, no port, and Apache answered `DNS lookup failure for: 127.0.0.1:` with the port empty. Node's actual failure — `Access denied for user 'root'@'localhost'`, because `loadConfig` fell through to its defaults with no env vars — was two layers down and invisible from the panel, which cheerfully reported the app as "started". That cost a day of downtime chasing application code that was never broken.
+
+To read the real startup error without SSH: rename `.htaccess` (so Apache stops handing requests to Passenger), drop in a PHP file that runs
+
+```
+bash -lc 'cd <appRoot> && source <venv>/bin/activate && timeout 15 node server.js'
+```
+
+and read the stack trace. Delete it immediately afterwards — it executes shell from a public URL.
+
+Any deploy automation must back up `.htaccess` before pulling and restore it after.

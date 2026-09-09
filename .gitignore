@@ -2,3 +2,15 @@ node_modules/
 db/*.db
 uploads/
 superadmin.zip
+
+# El .htaccess NO se versiona. En producción (cPanel/Passenger) ese archivo
+# contiene el bloque CLOUDLINUX PASSENGER CONFIGURATION y las variables de
+# entorno de la app — y como acá no se usa dotenv, es la ÚNICA fuente de
+# process.env en el servidor. Tenerlo en el repo hizo que cada deploy lo
+# pisara con la versión de 177 bytes, dejando a Node sin credenciales de
+# MySQL: arrancaba, moría en runMigrations y Apache reportaba
+# "DNS lookup failure for: 127.0.0.1:" (puerto vacío), a dos capas de la causa.
+.htaccess
+
+# Secretos locales.
+.env
