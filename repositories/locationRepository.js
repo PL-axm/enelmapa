@@ -1,3 +1,15 @@
+// Las ubicaciones de un negocio. Igual que el resto de los repos con tenant,
+// la única puerta de entrada es `forBusiness(businessId)`: no hay variante sin
+// scope que se pueda llamar por error.
+//
+// Hubo una `platform.getByBusinessId(businessId)` que era exactamente la misma
+// consulta que `forBusiness(businessId).getAll()` pero sin la guarda del id —
+// o sea, la variante sin scope que esta regla existe para que no exista. Con
+// un id nulo emitía `WHERE business_id = NULL`, que en MySQL no matchea nada:
+// devolvía `[]` y el negocio parecía no tener ubicaciones. No la llamaba nadie.
+//
+// Acá sólo hay SQL. Las reglas de negocio —que siempre haya exactamente una
+// principal, y que no se pueda borrar la última— viven en services/locationService.js.
 function buildLocationRepository(db) {
   return {
     forBusiness(businessId) {
@@ -6,9 +18,14 @@ function buildLocationRepository(db) {
       }
 
       return {
+        // La principal primero: la vista pública toma `locations[0]` como la
+        // dirección que muestra en el encabezado.
         async getAll() {
           const [rows] = await db.query(
-            'SELECT id, address, is_primary FROM business_locations WHERE business_id = ? ORDER BY is_primary DESC, created_at ASC',
+            `SELECT id, address, is_primary
+               FROM business_locations
+              WHERE business_id = ?
+              ORDER BY is_primary DESC, created_at ASC, id ASC`,
             [businessId]
           );
           return rows;
@@ -22,15 +39,15 @@ function buildLocationRepository(db) {
           return rows[0] || null;
         },
 
-        async create(address, isPrimary = 0) {
-          // Si es primaria, desmarcar otras
-          if (isPrimary) {
-            await db.query(
-              'UPDATE business_locations SET is_primary = 0 WHERE business_id = ?',
-              [businessId]
-            );
-          }
+        async count() {
+          const [rows] = await db.query(
+            'SELECT COUNT(*) AS total FROM business_locations WHERE business_id = ?',
+            [businessId]
+          );
+          return rows[0].total;
+        },
 
+        async create(address, isPrimary) {
           const [result] = await db.query(
             'INSERT INTO business_locations (business_id, address, is_primary) VALUES (?, ?, ?)',
             [businessId, address, isPrimary ? 1 : 0]
@@ -39,14 +56,6 @@ function buildLocationRepository(db) {
         },
 
         async update(locationId, { address, isPrimary }) {
-          // Si es primaria, desmarcar otras
-          if (isPrimary) {
-            await db.query(
-              'UPDATE business_locations SET is_primary = 0 WHERE business_id = ? AND id != ?',
-              [businessId, locationId]
-            );
-          }
-
           const [result] = await db.query(
             'UPDATE business_locations SET address = ?, is_primary = ? WHERE id = ? AND business_id = ?',
             [address, isPrimary ? 1 : 0, locationId, businessId]
@@ -55,16 +64,6 @@ function buildLocationRepository(db) {
         },
 
         async delete(locationId) {
-          // No permitir borrar si es la única ubicación
-          const [rows] = await db.query(
-            'SELECT COUNT(*) as count FROM business_locations WHERE business_id = ?',
-            [businessId]
-          );
-
-          if (rows[0].count <= 1) {
-            throw new Error('Cannot delete the last location. Every business must have at least one location.');
-          }
-
           const [result] = await db.query(
             'DELETE FROM business_locations WHERE id = ? AND business_id = ?',
             [locationId, businessId]
@@ -72,41 +71,39 @@ function buildLocationRepository(db) {
           return result.affectedRows > 0;
         },
 
-        async count() {
-          const [rows] = await db.query(
-            'SELECT COUNT(*) as count FROM business_locations WHERE business_id = ?',
-            [businessId]
-          );
-          return rows[0].count;
+        // Deja en cero el flag de todas menos `exceptoId`. Se usa siempre junto
+        // con marcar otra, y por eso el service lo envuelve en una transacción:
+        // sueltas, si la segunda escritura falla el negocio queda sin ninguna
+        // principal.
+        async desmarcarPrincipales(exceptoId = null) {
+          const [result] = exceptoId === null
+            ? await db.query(
+                'UPDATE business_locations SET is_primary = 0 WHERE business_id = ?',
+                [businessId]
+              )
+            : await db.query(
+                'UPDATE business_locations SET is_primary = 0 WHERE business_id = ? AND id != ?',
+                [businessId, exceptoId]
+              );
+          return result.affectedRows;
         },
 
-        async getOrCreateDefault() {
-          const locations = await this.getAll();
-          if (locations.length === 0) {
-            // Crear ubicación por defecto desde businesses.address si existe
-            const [bizRows] = await db.query(
-              'SELECT address FROM businesses WHERE id = ?',
-              [businessId]
-            );
-
-            if (bizRows[0]?.address) {
-              const id = await this.create(bizRows[0].address, 1);
-              return { id, address: bizRows[0].address, is_primary: 1 };
-            }
-          }
-          return locations[0] || null;
+        // Asciende la ubicación más vieja que quede. Hace falta después de
+        // borrar la principal: si no, el negocio queda con ubicaciones y
+        // ninguna marcada, y la vista pública muestra como dirección principal
+        // lo que caiga primero en el orden.
+        async promoverMasAntigua() {
+          const [result] = await db.query(
+            `UPDATE business_locations
+                SET is_primary = 1
+              WHERE business_id = ?
+              ORDER BY created_at ASC, id ASC
+              LIMIT 1`,
+            [businessId]
+          );
+          return result.affectedRows > 0;
         }
       };
-    },
-
-    platform: {
-      async getByBusinessId(businessId) {
-        const [rows] = await db.query(
-          'SELECT id, address, is_primary FROM business_locations WHERE business_id = ? ORDER BY is_primary DESC, created_at ASC',
-          [businessId]
-        );
-        return rows;
-      }
     }
   };
 }

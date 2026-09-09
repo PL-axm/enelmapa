@@ -195,33 +195,35 @@ function createApiRouter({ repos, services }) {
     res.json({ locations });
   }));
 
+  // Las tres escrituras pasan por el service: el invariante "exactamente una
+  // principal" abarca más de una fila, así que necesita transacción y no puede
+  // resolverse desde acá.
   router.post('/locations', authRequired, validate(schemas.newLocation), asyncHandler(async (req, res) => {
     const { address, is_primary } = req.body;
-    const id = await repos.locations.forBusiness(req.session.businessId).create(address, is_primary ? 1 : 0);
+    const id = await services.locations.crear(req.session.businessId, {
+      address,
+      isPrimary: is_primary
+    });
     res.json({ ok: true, id, address, is_primary });
   }));
 
   router.put('/locations/:id', authRequired, requireIntParam('id'), validate(schemas.editLocation), asyncHandler(async (req, res) => {
     const { address, is_primary } = req.body;
-    const afectó = await repos.locations.forBusiness(req.session.businessId).update(req.params.id, {
+    const afectó = await services.locations.actualizar(req.session.businessId, req.params.id, {
       address,
-      isPrimary: is_primary ? 1 : 0
+      isPrimary: is_primary
     });
     requireAffected(afectó, 'Ubicación no encontrada');
     res.json({ ok: true });
   }));
 
+  // Sin try/catch: el service lanza NotFoundError o ValidationError según el
+  // caso y errorHandler los traduce. Antes se pescaba el error genérico del
+  // repo con `err.message.includes('last location')` — un cambio de redacción
+  // en ese texto convertía el 400 en un 500 sin que nada avisara.
   router.delete('/locations/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
-    try {
-      const afectó = await repos.locations.forBusiness(req.session.businessId).delete(req.params.id);
-      requireAffected(afectó, 'Ubicación no encontrada');
-      res.json({ ok: true });
-    } catch (err) {
-      if (err.message.includes('last location')) {
-        throw new ValidationError('No se puede eliminar la última ubicación. El negocio debe tener al menos una.');
-      }
-      throw err;
-    }
+    await services.locations.eliminar(req.session.businessId, req.params.id);
+    res.json({ ok: true });
   }));
 
   // === QR CODE ===

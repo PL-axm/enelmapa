@@ -7,6 +7,7 @@ const userRepository = require('./repositories/userRepository');
 const locationRepository = require('./repositories/locationRepository');
 const authService = require('./services/authService');
 const businessService = require('./services/businessService');
+const locationService = require('./services/locationService');
 const qrService = require('./services/qrService');
 const menuService = require('./services/menuService');
 const { createLogger } = require('./services/logger');
@@ -76,7 +77,8 @@ function createContainer(config) {
     auth,
     qr: qrService({ config }),
     menu: menuService(),
-    businesses: businessService({ repos, withTransaction, auth })
+    businesses: businessService({ repos, withTransaction, auth }),
+    locations: locationService({ withTransaction })
   };
 
   return {
