@@ -1,0 +1,6 @@
+# Los scripts de shell y los .sql se guardan y se sacan SIEMPRE con LF, se
+# clonen donde se clonen. Un .sh con finales de línea de Windows falla en el
+# servidor con "bad interpreter: /bin/bash^M", y el mensaje no dice nada sobre
+# finales de línea.
+*.sh  text eol=lf
+*.sql text eol=lf
