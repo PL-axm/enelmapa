@@ -31,11 +31,13 @@ function createTenantMiddleware({ repos }) {
     const hours = await repos.businesses.forBusiness(business.id).hours();
     const categories = await repos.categories.forBusiness(business.id).listOrdered();
     const products = await repos.products.forBusiness(business.id).listActive();
+    const locations = await repos.locations.forBusiness(business.id).getAll();
 
     req.business = business;
     req.businessHours = hours;
     req.categories = categories;
     req.products = products;
+    req.locations = locations;
 
     next();
   });

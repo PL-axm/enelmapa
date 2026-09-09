@@ -294,6 +294,17 @@ const schemas = {
 
   resetPassword: z.object({
     new_password: z.string().min(8, 'La contraseña necesita al menos 8 caracteres')
+  }),
+
+  // === ubicaciones ===
+  newLocation: z.object({
+    address: texto(500, 'La dirección'),
+    is_primary: z.coerce.boolean().optional().default(false)
+  }),
+
+  editLocation: z.object({
+    address: texto(500, 'La dirección'),
+    is_primary: z.coerce.boolean().optional().default(false)
   })
 };
 
