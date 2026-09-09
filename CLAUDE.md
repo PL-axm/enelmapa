@@ -152,6 +152,21 @@ Two smaller traps worth keeping in mind:
 
 The public menu falls back to `business.address` when a tenant has no rows yet, so the feature degrades instead of breaking for businesses that never opened the panel.
 
+### The landing — the root of the domain
+
+`GET /` is the **platform's** page, not a tenant's: `views/landing.ejs`, which sells the service to businesses that are not customers yet. Subdomains are intercepted before it, and `getSubdomain` excludes `www`, so `www.enelmapa.co` lands here too.
+
+Two things about it are product decisions, not copy:
+
+- **There is no "create your account" button, and there must not be.** `BUSINESS_MODEL.md` is explicit that a superadmin provisions every business by hand. A self-signup CTA would promise a flow that does not exist, so every action leads to a real contact — WhatsApp or email.
+- **The niche is any business with a product list**, not restaurants. Cafés, bars, restaurants, hardware stores. The code says "menu" for historical reasons; the page says catalogue.
+
+`listForHome(limite = 12)` backs the social-proof strip. **The cap belongs in the SQL**, and the test asserts it against the repository rather than the HTML: the public root runs this on every visit, and trimming in the view would still fetch every row as the customer list grows. Businesses with a logo sort first, since those are the ones that look right in the strip.
+
+Contact details live in `config.contacto`, not in the template — and with defaults rather than being required. In production the env vars arrive through Passenger's configuration, which has been lost once already; a missing phone number must not stop the platform from booting.
+
+The scroll reveals hide themselves through a `.js` class added by a **synchronous script in `<head>`**. Hiding by default and revealing with JS leaves the whole page blank when the script never arrives, and putting the class in the deferred file would let the content paint before it hides — a flash on every load. `public/css/landing.css` is a separate file rather than inline like `views/menu.ejs`, because nothing here is themed per tenant.
+
 ### Request-edge conventions
 
 - **Validation**: zod schemas in `validators/`, applied by `middleware/validate.js`, which *replaces* `req.body` with the coerced data — so a handler never sees a raw string where it expects a number. On failure it also deletes any file multer already wrote to disk.
@@ -227,7 +242,9 @@ PassengerStartupFile server.js
 # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
 ```
 
-**That file is gitignored, and must stay that way.** It carries the Passenger block *and* the app's environment variables, which cPanel writes into it — and since nothing here loads `dotenv`, it is the **only** source of `process.env` in production. The `.env` sitting in the app directory is a leftover that Node never reads.
+**That file is gitignored, and must stay that way.** It carries the Passenger block *and* the app's environment variables, which cPanel writes into it, and in production it is the **only** source of `process.env`.
+
+The `.env` file in the app directory does not fill that role, and the difference is easy to get backwards: `npm start` and `npm run dev` pass `--env-file-if-exists=.env` (Node's own flag — there is no `dotenv` dependency to grep for), so **locally the file is read**. Production never runs those scripts: `PassengerStartupFile server.js` executes the file directly, so the flag never applies and `.env` is inert there.
 
 The repo used to track a 177-byte `.htaccess` holding a `RewriteRule` to `127.0.0.1:%{ENV:PASSENGER_BASE_PORT}` — a different architecture (Passenger standalone on a port) that this deployment does not use. Every `git pull` overwrote the real file with it, so Passenger never got told what the app was: no app, no port, and Apache answered `DNS lookup failure for: 127.0.0.1:` with the port empty. Node's actual failure — `Access denied for user 'root'@'localhost'`, because `loadConfig` fell through to its defaults with no env vars — was two layers down and invisible from the panel, which cheerfully reported the app as "started". That cost a day of downtime chasing application code that was never broken.
 

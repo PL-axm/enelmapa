@@ -4,7 +4,9 @@ Este documento describe el modelo de negocio **tal como está implementado en el
 
 ## Qué es
 
-**enelmapa** es una plataforma SaaS multi-tenant de **menús digitales** para negocios de comida y bebida (cafés, restaurantes). Cada negocio obtiene una página de menú pública, accesible por QR o URL, que reemplaza al menú físico impreso.
+**enelmapa** es una plataforma SaaS multi-tenant de **catálogos de producto digitales**. Cada negocio obtiene una página pública, accesible por QR o URL, que reemplaza al catálogo o menú impreso.
+
+El nicho **no es sólo gastronomía**: es cualquier negocio con una lista de productos que mostrar y que hoy la imprime — cafés, bares, restaurantes, ferreterías. El código llama "menú" al producto por su origen, pero la propuesta comercial es el catálogo. La landing de la plataforma se dirige a los cuatro rubros de forma explícita, porque un ferretero que lee "menús digitales para restaurantes" se va antes de entender que le sirve.
 
 ## Los tres roles del negocio
 
@@ -56,7 +58,18 @@ Estos son puntos donde el producto actual no tiene soporte — relevante si se v
 - **Sin autoservicio**: no existe un flujo de "regístrate y crea tu negocio" para el cliente final del negocio; todo pasa por el superadmin.
 - **Sin analítica**: no se registran vistas del menú, clics en productos, ni conversión a WhatsApp — no hay forma de mostrarle al negocio "cuánta gente vio tu menú".
 - **Un usuario admin no está limitado a uno por negocio** por el modelo de datos (`users.business_id`), pero no hay UI para invitar/gestionar múltiples usuarios de un mismo negocio desde `/admin` (solo el superadmin puede crear usuarios, vía alta de negocio o edición).
-- **Sin soporte multi-sucursal**: cada negocio es una única entidad `businesses`; una marca con varias sedes necesitaría un slug (y URL) separado por sede.
+- **Sin captura de contactos**: la landing manda a WhatsApp y a correo, así que el lead vive en la bandeja de alguien y no en la plataforma. No hay registro de quién preguntó ni cuándo.
+
+## Puerta de entrada comercial
+
+La raíz del dominio (`enelmapa.co`) es la **landing de la plataforma**: explica el servicio y lleva a un contacto real — WhatsApp o correo—, nunca a un registro de autoservicio, porque ese flujo no existe (ver "onboarding" más arriba). Los subdominios y `/s/:slug` siguen siendo de cada negocio; la raíz es de enelmapa.
+
+Muestra además una franja con hasta 12 negocios ya activos como prueba social, con enlace a sus catálogos reales — lo más persuasivo disponible, y una fuente de tráfico para los clientes actuales.
+
+## Resuelto desde la versión inicial de este documento
+
+- **Multi-sucursal**: ya no hace falta un slug por sede. Un negocio tiene varias direcciones en `business_locations`, con una marcada como principal, y todas aparecen en su catálogo.
+- **Promociones**: precio promocional o etiqueta (2x1, "martes de alitas"), con vigencia por fechas y por día de la semana, evaluadas en el servidor y en la zona horaria del negocio.
 
 ## Flujo típico end-to-end
 
