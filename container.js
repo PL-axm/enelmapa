@@ -4,8 +4,10 @@ const categoryRepository = require('./repositories/categoryRepository');
 const productRepository = require('./repositories/productRepository');
 const businessRepository = require('./repositories/businessRepository');
 const userRepository = require('./repositories/userRepository');
+const locationRepository = require('./repositories/locationRepository');
 const authService = require('./services/authService');
 const businessService = require('./services/businessService');
+const locationService = require('./services/locationService');
 const qrService = require('./services/qrService');
 const menuService = require('./services/menuService');
 const { createLogger } = require('./services/logger');
@@ -34,8 +36,9 @@ function buildRepos(db) {
   const products = productRepository(db, categories);
   const businesses = businessRepository(db);
   const users = userRepository(db);
+  const locations = locationRepository(db);
 
-  return { categories, products, businesses, users };
+  return { categories, products, businesses, users, locations };
 }
 
 function createContainer(config) {
@@ -74,7 +77,8 @@ function createContainer(config) {
     auth,
     qr: qrService({ config }),
     menu: menuService(),
-    businesses: businessService({ repos, withTransaction, auth })
+    businesses: businessService({ repos, withTransaction, auth }),
+    locations: locationService({ withTransaction })
   };
 
   return {

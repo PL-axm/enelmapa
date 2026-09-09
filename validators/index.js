@@ -200,6 +200,25 @@ const horarios = z
   })).max(7, 'No puede haber más de 7 días'))
   .optional();
 
+// === ubicaciones ===
+//
+// `is_primary` NO usa `z.coerce.boolean()`: `Boolean("false")` es `true`, y
+// `Boolean("0")` también. Cualquier cliente que mande el valor como texto —un
+// form urlencoded, un curl a mano— marcaría la ubicación como principal justo
+// cuando pidió lo contrario, y el efecto es visible: le roba el rótulo a la que
+// sí lo era y le cambia la dirección al encabezado del menú. Se enumeran los
+// valores aceptados y se decide sobre esa lista.
+const banderaBooleana = z
+  .union([z.boolean(), z.enum(['true', 'false', '1', '0']), z.literal(0), z.literal(1)])
+  .optional()
+  .default(false)
+  .transform((v) => v === true || v === 1 || v === 'true' || v === '1');
+
+const ubicación = z.object({
+  address: texto(500, 'La dirección'),
+  is_primary: banderaBooleana
+});
+
 const schemas = {
   // === categorías ===
   categoryName: z.object({
@@ -294,7 +313,13 @@ const schemas = {
 
   resetPassword: z.object({
     new_password: z.string().min(8, 'La contraseña necesita al menos 8 caracteres')
-  })
+  }),
+
+  // === ubicaciones ===
+  // Crear y editar validan lo mismo, así que comparten el esquema: son dos
+  // nombres para que las rutas se lean solas, no dos reglas distintas.
+  newLocation: ubicación,
+  editLocation: ubicación
 };
 
 module.exports = { schemas, SLUGS_RESERVADOS };

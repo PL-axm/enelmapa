@@ -123,6 +123,35 @@ businesses.promo_flyer VARCHAR(500) -- one image, shown as a popup on load
 
 `menuService.buildMenu` returns `{ promos, categorias }`. `promos` is `null` when the section is off, when nothing is valid today, or when no date was passed, so **the decision to show the section lives in one place**. A product on promotion appears in the section *and* in its own category: the section is a shortcut, not a move.
 
+### Locations
+
+A business can have several addresses (branches). Everything else — products, hours, contact details — is shared; only the address multiplies.
+
+```sql
+business_locations
+  business_id  -- FK, ON DELETE CASCADE
+  address      VARCHAR(500)
+  is_primary   TINYINT
+  UNIQUE (business_id, address)
+```
+
+`businesses.address` **stays**: migration `008` seeds the first location from it, and with no DDL rollback it is the only way back if the new table is ever wrong.
+
+**The invariant is that a business with locations has exactly one primary.** It is not cosmetic — `views/menu.ejs` renders `locations[0]` as the address in the header, and `getAll()` orders by `is_primary DESC`, so "no primary" does not mean "neutral", it means *whichever row the sort happens to put first*. The panel also draws a "Principal" badge from it.
+
+That invariant spans several rows, so all three writes go through **`services/locationService.js` inside `withTransaction`** — same reason `businessService.createWithDefaults` exists. `locationRepository` holds only SQL. Three ways it broke before the service existed, all found by writing the tests:
+
+- the **first** location wasn't primary — the flag was only set when the form asked for it, and the common case is adding one address and stopping;
+- setting a primary was two loose writes (clear the others, set this one): if the second failed, **zero** were primary;
+- deleting the primary promoted nobody.
+
+Two smaller traps worth keeping in mind:
+
+- **Check existence before counting.** Deleting a non-existent id in a business that has one location used to answer *"can't delete the last one"* instead of `404`.
+- **`is_primary` must not use `z.coerce.boolean()`** — `Boolean("false")` is `true`, and so is `Boolean("0")`. A client sending the value as text marked the location primary exactly when it asked for the opposite. `validators/index.js` enumerates the accepted values instead.
+
+The public menu falls back to `business.address` when a tenant has no rows yet, so the feature degrades instead of breaking for businesses that never opened the panel.
+
 ### Request-edge conventions
 
 - **Validation**: zod schemas in `validators/`, applied by `middleware/validate.js`, which *replaces* `req.body` with the coerced data — so a handler never sees a raw string where it expects a number. On failure it also deletes any file multer already wrote to disk.

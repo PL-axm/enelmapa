@@ -189,6 +189,43 @@ function createApiRouter({ repos, services }) {
     res.json({ ok: true });
   }));
 
+  // === LOCATIONS ===
+  router.get('/locations', authRequired, asyncHandler(async (req, res) => {
+    const locations = await repos.locations.forBusiness(req.session.businessId).getAll();
+    res.json({ locations });
+  }));
+
+  // Las tres escrituras pasan por el service: el invariante "exactamente una
+  // principal" abarca más de una fila, así que necesita transacción y no puede
+  // resolverse desde acá.
+  router.post('/locations', authRequired, validate(schemas.newLocation), asyncHandler(async (req, res) => {
+    const { address, is_primary } = req.body;
+    const id = await services.locations.crear(req.session.businessId, {
+      address,
+      isPrimary: is_primary
+    });
+    res.json({ ok: true, id, address, is_primary });
+  }));
+
+  router.put('/locations/:id', authRequired, requireIntParam('id'), validate(schemas.editLocation), asyncHandler(async (req, res) => {
+    const { address, is_primary } = req.body;
+    const afectó = await services.locations.actualizar(req.session.businessId, req.params.id, {
+      address,
+      isPrimary: is_primary
+    });
+    requireAffected(afectó, 'Ubicación no encontrada');
+    res.json({ ok: true });
+  }));
+
+  // Sin try/catch: el service lanza NotFoundError o ValidationError según el
+  // caso y errorHandler los traduce. Antes se pescaba el error genérico del
+  // repo con `err.message.includes('last location')` — un cambio de redacción
+  // en ese texto convertía el 400 en un 500 sin que nada avisara.
+  router.delete('/locations/:id', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
+    await services.locations.eliminar(req.session.businessId, req.params.id);
+    res.json({ ok: true });
+  }));
+
   // === QR CODE ===
   router.get('/qr', authRequired, asyncHandler(async (req, res) => {
     const business = await repos.businesses.forBusiness(req.session.businessId).get();
