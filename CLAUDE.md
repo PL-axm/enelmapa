@@ -239,4 +239,20 @@ bash -lc 'cd <appRoot> && source <venv>/bin/activate && timeout 15 node server.j
 
 and read the stack trace. Delete it immediately afterwards — it executes shell from a public URL.
 
-Any deploy automation must back up `.htaccess` before pulling and restore it after.
+#### The deploy itself
+
+`deploy/deploy.sh`, run every 5 minutes by cron. The running copy lives at `~/deploy-enelmapa.sh`, outside the docroot, and updates itself from the repo at the end of each deploy — so improving the process here is enough, nothing has to be reinstalled by hand.
+
+Cron rather than a GitHub webhook, for two reasons. `PassengerBaseURI "/"` means **every** request to the domain is handed to Node, so a PHP endpoint inside the app root doesn't reliably execute — you have to move `.htaccess` out of the way first, which is exactly what an unattended deploy cannot do. And a public URL that runs shell is a target: this server's logs show bots probing `/.env`, `/admin/.env`, `/backup/.env` at over a hundred requests a minute.
+
+**Restarting Node is the part that is not obvious.** `touch tmp/restart.txt` — Passenger's documented mechanism — **does nothing here.** Measured: the file was touched every five minutes and the process held the same PID for forty minutes, serving stale EJS from Express's view cache. The code on disk silently stops being the code that runs, and the panel keeps reporting the app as "started". Both clean alternatives are closed too: `cloudlinux-selector` isn't reachable from the account's jailshell, and `uapi PassengerApps list_applications` returns empty because the app belongs to CloudLinux's Node.js Selector, not cPanel's Application Manager. What works is killing the process and letting Passenger respawn it:
+
+```
+pkill -f "Passenger NodeApp: /home/<user>/public_html/enelmapa.co"
+```
+
+The pattern has to be that name — Passenger renames the process, so matching the node binary's path finds nothing. Written inline in a cron command it would match *itself* in the process list and commit suicide; spell the domain `enelmapa[.]co` there. From a script file it's safe, since the command line is just the script's path.
+
+The deploy then curls the site once, so the cold start — which runs the migrations — is paid by the deploy instead of the first customer through the door.
+
+`npm install` runs only when `package.json` or `package-lock.json` actually changed. If it fails, the log says so loudly and **Node is deliberately not restarted**: serving the previous code beats booting with broken dependencies.
