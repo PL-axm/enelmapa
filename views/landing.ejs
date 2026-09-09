@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnElMapa — El catálogo de tu negocio, siempre al día</title>
+<meta name="description" content="Tu carta o tu catálogo de productos en una página web propia, con código QR para el mostrador. Lo actualizás vos, en cualquier momento, sin reimprimir nada.">
+
+<meta property="og:title" content="EnElMapa — El catálogo de tu negocio, siempre al día">
+<meta property="og:description" content="Tu carta o tu catálogo de productos en una página web propia, con código QR para el mostrador.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/landing.css">
+
+<!-- Marca que hay JS ANTES de que se pinte nada. El estado oculto de los
+     revelados cuelga de esta clase: sin ella no se oculta nada, así que si el
+     script diferido no llega —bloqueador, error de red— la landing se lee
+     igual en vez de quedar en blanco. Va acá y no en landing.js porque `defer`
+     corre después del parseo, y el contenido alcanzaría a dibujarse antes de
+     esconderse: un parpadeo en cada carga. -->
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+
+<%
+  // El texto que el visitante ENVÍA al abrir WhatsApp — así funciona wa.me:
+  // el mensaje va prellenado en su lado, no es algo que él reciba.
+  const saludo = 'Hola 👋 Quiero llevar el catálogo de mi negocio a EnElMapa. ¿Me cuentan cómo funciona?';
+  const wa = 'https://wa.me/' + contacto.whatsapp + '?text=' + encodeURIComponent(saludo);
+  // Un menú real vale más que cualquier captura. Si todavía no hay negocios
+  // cargados, el botón simplemente no se dibuja.
+  const ejemplo = businesses.length > 0 ? businesses[0] : null;
+%>
+
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+
+<header class="nav" id="nav">
+  <a class="nav-marca" href="/">
+    <span class="nav-punto" aria-hidden="true"></span>
+    EnElMapa
+  </a>
+  <nav class="nav-links" aria-label="Principal">
+    <a href="#servicio">Qué es</a>
+    <a href="#incluye">Qué incluye</a>
+    <a href="#pasos">Cómo empieza</a>
+  </nav>
+  <a class="nav-sesion" href="/admin/login">Iniciar sesión</a>
+</header>
+
+<main id="contenido">
+
+  <section class="hero">
+    <p class="hero-kicker reveal">Para cafés, bares, restaurantes y ferreterías</p>
+    <h1 class="hero-titulo reveal">
+      El catálogo de tu negocio,<br>
+      <em>siempre</em> al día.
+    </h1>
+    <p class="hero-bajada reveal">
+      Tus productos en una página propia, con un código QR para el mostrador o la mesa.
+      Cambiás un precio y ya está cambiado. Sin reimprimir nada, sin llamar a nadie.
+    </p>
+    <div class="hero-acciones reveal">
+      <a class="boton boton-primario" href="<%= wa %>" target="_blank" rel="noopener">
+        Escribinos por WhatsApp
+      </a>
+      <% if (ejemplo) { %>
+        <a class="boton boton-fantasma" href="/s/<%= ejemplo.slug %>">
+          Ver uno real →
+        </a>
+      <% } %>
+    </div>
+  </section>
+
+  <section class="problema" id="servicio">
+    <div class="problema-grid">
+      <p class="etiqueta reveal">El problema</p>
+      <div class="problema-texto">
+        <p class="declaracion reveal">
+          Subió el precio de un producto. Ahora hay que rehacer la carta,
+          mandarla a imprimir, esperar, pagar — y mientras tanto el cliente
+          lee un precio que ya no existe.
+        </p>
+        <p class="parrafo reveal">
+          Eso pasa cada vez que cambia un costo, se agota un producto o entra
+          uno nuevo. El menú impreso nace desactualizado y envejece rápido.
+          Y si tenés más de un local, multiplicá el problema por la cantidad
+          de sedes.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="incluye" id="incluye">
+    <p class="etiqueta reveal">Qué incluye</p>
+    <h2 class="seccion-titulo reveal">Todo lo que necesita tu catálogo para vivir en internet.</h2>
+
+    <ul class="tarjetas">
+      <li class="tarjeta reveal">
+        <span class="tarjeta-num">01</span>
+        <h3>Código QR para imprimir</h3>
+        <p>Lo generás desde tu panel y lo pegás en la mesa, la vitrina o el mostrador. El cliente escanea y ve tu catálogo al instante, sin descargar nada.</p>
+      </li>
+      <li class="tarjeta reveal">
+        <span class="tarjeta-num">02</span>
+        <h3>Lo actualizás vos</h3>
+        <p>Precios, productos, fotos y descripciones. Entrás a tu panel, cambiás lo que sea y queda publicado en el momento. No dependés de nosotros para nada.</p>
+      </li>
+      <li class="tarjeta reveal">
+        <span class="tarjeta-num">03</span>
+        <h3>Promociones con vigencia</h3>
+        <p>Un 2x1, un descuento, un martes especial. Poné desde cuándo, hasta cuándo y qué días de la semana: aparece y desaparece solo.</p>
+      </li>
+      <li class="tarjeta reveal">
+        <span class="tarjeta-num">04</span>
+        <h3>Varias sedes</h3>
+        <p>Una marca con más de un local muestra todas sus direcciones en el mismo catálogo, con la principal destacada.</p>
+      </li>
+      <li class="tarjeta reveal">
+        <span class="tarjeta-num">05</span>
+        <h3>Horarios y abierto/cerrado</h3>
+        <p>Tus horarios por día, y un indicador de si estás atendiendo ahora mismo. El cliente sabe si puede ir antes de salir de la casa.</p>
+      </li>
+      <li class="tarjeta reveal">
+        <span class="tarjeta-num">06</span>
+        <h3>Tu dirección propia</h3>
+        <p>Tunegocio.enelmapa.co, con el diseño y los colores que elijas. Un WhatsApp a un toque para que te escriban o te pidan.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section class="pasos" id="pasos">
+    <p class="etiqueta reveal">Cómo empieza</p>
+    <h2 class="seccion-titulo reveal">Tres pasos, y no son tuyos los dos primeros.</h2>
+
+    <ol class="pasos-lista">
+      <li class="paso reveal">
+        <span class="paso-num">1</span>
+        <div>
+          <h3>Nos escribís</h3>
+          <p>Por WhatsApp o dejándonos tus datos. Charlamos qué vende tu negocio y cómo conviene ordenarlo.</p>
+        </div>
+      </li>
+      <li class="paso reveal">
+        <span class="paso-num">2</span>
+        <div>
+          <h3>Te lo dejamos armado</h3>
+          <p>Creamos tu página, tu dirección propia y tu acceso. No tenés que configurar nada.</p>
+        </div>
+      </li>
+      <li class="paso reveal">
+        <span class="paso-num">3</span>
+        <div>
+          <h3>Cargás y publicás</h3>
+          <p>Entrás con tu usuario, subís tus productos e imprimís tu QR. De ahí en adelante, el catálogo es tuyo.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <% if (businesses.length > 0) { %>
+    <section class="confian">
+      <p class="etiqueta reveal">Ya están en el mapa</p>
+      <ul class="logos">
+        <% businesses.forEach(b => { %>
+          <li class="logo-item reveal">
+            <a href="/s/<%= b.slug %>">
+              <% if (b.logo_img) { %>
+                <img src="<%= b.logo_img %>" alt="<%= b.name %>" loading="lazy" width="72" height="72">
+              <% } else { %>
+                <span class="logo-inicial" aria-hidden="true"><%= b.name.trim().charAt(0) %></span>
+              <% } %>
+              <span class="logo-nombre"><%= b.name %></span>
+            </a>
+          </li>
+        <% }) %>
+      </ul>
+    </section>
+  <% } %>
+
+  <section class="cierre" id="contacto">
+    <h2 class="cierre-titulo reveal">¿Empezamos?</h2>
+    <p class="cierre-bajada reveal">
+      Contanos qué vende tu negocio y te mostramos cómo se vería tu catálogo.
+    </p>
+    <a class="boton boton-primario boton-grande reveal" href="<%= wa %>" target="_blank" rel="noopener">
+      Escribinos por WhatsApp
+    </a>
+    <p class="cierre-alterna reveal">
+      O escribinos a <a href="mailto:<%= contacto.email %>"><%= contacto.email %></a>
+    </p>
+  </section>
+
+</main>
+
+<footer class="pie">
+  <div class="pie-marca">EnElMapa</div>
+  <div class="pie-links">
+    <a href="/admin/login">Iniciar sesión</a>
+    <a href="<%= wa %>" target="_blank" rel="noopener">WhatsApp</a>
+    <a href="mailto:<%= contacto.email %>"><%= contacto.email %></a>
+  </div>
+</footer>
+
+<script src="/js/landing.js" defer></script>
+</body>
+</html>

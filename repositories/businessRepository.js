@@ -91,9 +91,25 @@ function businessRepository(db) {
       },
 
       // Para la home: sólo lo que la portada necesita, no la fila entera.
-      async listForHome() {
+      // La franja de "ya confían en nosotros" de la landing.
+      //
+      // El LIMIT es parte del contrato, no una comodidad de la vista: esto lo
+      // consulta la raíz pública en cada visita, y sin tope la consulta crece
+      // con la cartera de clientes hasta traer cientos de filas para mostrar
+      // una docena de logos. Recortar en el EJS no evitaría el trabajo, sólo
+      // lo escondería.
+      //
+      // Los que tienen logo van primero porque son los que se ven bien en la
+      // franja; los demás caen al final y quedan fuera del tope de forma
+      // natural.
+      async listForHome(limite = 12) {
+        const tope = Number.isInteger(limite) && limite > 0 ? Math.min(limite, 50) : 12;
         const [rows] = await db.query(
-          'SELECT slug, name, logo_img FROM businesses ORDER BY name'
+          `SELECT slug, name, logo_img
+             FROM businesses
+            ORDER BY (logo_img IS NULL OR logo_img = ''), name
+            LIMIT ?`,
+          [tope]
         );
         return rows;
       },

@@ -74,9 +74,12 @@ function createApp({ repos, services, config, sessionStore, logger }) {
 
   app.get('/s/:slug', tenantMiddleware, publicRoutes);
 
+  // La raíz del dominio es la landing de la plataforma, no un menú: acá no hay
+  // tenant que resolver. Los subdominios se atajaron más arriba y `www` queda
+  // excluido por getSubdomain, así que www.enelmapa.co también cae acá.
   app.get('/', asyncHandler(async (req, res) => {
     const businesses = await repos.businesses.platform.listForHome();
-    res.render('home', { businesses });
+    res.render('landing', { businesses, contacto: config.contacto });
   }));
 
   // Estos dos van últimos y en este orden: lo que no matcheó ninguna ruta es un
