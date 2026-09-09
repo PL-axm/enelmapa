@@ -31,6 +31,17 @@ const DEFAULT_ZONA_HORARIA = 'America/Bogota';
 const DEFAULT_SUPER_EMAIL = 'admin@enelmapa.co';
 const DEFAULT_SUPER_PASS = 'super2026';
 
+// Los canales de contacto de la landing. Van acá y no escritos en la vista
+// porque son datos de la plataforma, no maquetado, y porque cambiar un número
+// de teléfono no debería requerir tocar HTML.
+//
+// Tienen default en vez de ser obligatorios a propósito: en producción las
+// variables de entorno llegan por la configuración de Passenger, que ya se
+// perdió una vez y dejó el sitio caído. Un contacto que falta no debe impedir
+// que la plataforma levante — a lo sumo muestra el número de siempre.
+const DEFAULT_WHATSAPP = '573147237457';
+const DEFAULT_EMAIL_CONTACTO = 'enelmapacol@gmail.com';
+
 // Límites de intentos de login por IP. El superadmin es más estricto: es una
 // sola cuenta conocida, así que nadie legítimo necesita muchos reintentos, y
 // es la que más daño hace si cae (hallazgo S5).
@@ -90,6 +101,11 @@ function loadConfig(env = process.env) {
       windowMs: intOrDefault(env.RATE_LIMIT_WINDOW_MIN, DEFAULT_RATE_WINDOW_MIN) * 60 * 1000,
       loginMax: intOrDefault(env.RATE_LIMIT_LOGIN_MAX, DEFAULT_LOGIN_MAX),
       superadminMax: intOrDefault(env.RATE_LIMIT_SUPER_MAX, DEFAULT_SUPER_LOGIN_MAX)
+    },
+    contacto: {
+      // Sólo dígitos, con código de país: es el formato que espera wa.me.
+      whatsapp: env.CONTACTO_WHATSAPP || DEFAULT_WHATSAPP,
+      email: env.CONTACTO_EMAIL || DEFAULT_EMAIL_CONTACTO
     },
     session: buildSessionOptions(env)
   };

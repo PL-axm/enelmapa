@@ -1,0 +1,446 @@
+/* Landing de la plataforma (la raíz del dominio).
+ *
+ * Va en un archivo aparte y no inline en el EJS —al revés que views/menu.ejs—
+ * porque acá no hay tematización por negocio que justifique inyectar el CSS en
+ * la página. Sin variables que dependan del tenant, un archivo estático es
+ * cacheable y deja la vista legible.
+ *
+ * El acento es el mismo #C8956C que usa el panel: la landing y el producto
+ * tienen que sentirse la misma marca, no dos sitios distintos.
+ */
+
+:root {
+  --tinta: #0B0B0A;
+  --tinta-suave: #141412;
+  --linea: #262521;
+  --papel: #F4F1EA;
+  --papel-tenue: #A9A497;
+  --acento: #C8956C;
+
+  --display: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --texto: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+
+  --borde-max: 1240px;
+  --aire: clamp(72px, 12vw, 160px);
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--tinta);
+  color: var(--papel);
+  font-family: var(--texto);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a { color: inherit; }
+
+/* Sólo visible al tabular: la landing es la primera página de la plataforma y
+ * tiene que poder recorrerse con teclado. */
+.saltar {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--acento);
+  color: var(--tinta);
+  padding: 12px 20px;
+  z-index: 100;
+  text-decoration: none;
+  font-weight: 600;
+}
+.saltar:focus { left: 12px; top: 12px; }
+
+:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 3px;
+}
+
+/* ---------- navegación ---------- */
+
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 20px clamp(20px, 5vw, 56px);
+  background: rgba(11, 11, 10, 0.72);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+.nav.pegado { border-bottom-color: var(--linea); background: rgba(11, 11, 10, 0.92); }
+
+.nav-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  margin-right: auto;
+}
+.nav-punto {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--acento);
+}
+
+.nav-links { display: flex; gap: 28px; }
+.nav-links a {
+  text-decoration: none;
+  font-size: 15px;
+  color: var(--papel-tenue);
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--papel); }
+
+.nav-sesion {
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: border-color 0.2s, color 0.2s;
+}
+.nav-sesion:hover { border-color: var(--acento); color: var(--acento); }
+
+@media (max-width: 860px) {
+  .nav-links { display: none; }
+}
+
+/* ---------- piezas compartidas ---------- */
+
+section {
+  max-width: var(--borde-max);
+  margin: 0 auto;
+  padding: var(--aire) clamp(20px, 5vw, 56px);
+}
+
+.etiqueta {
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--acento);
+  margin: 0 0 24px;
+}
+
+.seccion-titulo {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(30px, 4.6vw, 54px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  margin: 0 0 clamp(40px, 6vw, 72px);
+  max-width: 18ch;
+}
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 16px 30px;
+  border-radius: 999px;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.boton-primario {
+  background: var(--acento);
+  color: var(--tinta);
+}
+.boton-primario:hover { transform: translateY(-2px); background: #d8a67d; }
+.boton-fantasma {
+  border: 1px solid var(--linea);
+  color: var(--papel);
+}
+.boton-fantasma:hover { border-color: var(--acento); color: var(--acento); }
+.boton-grande { padding: 20px 40px; font-size: 18px; }
+
+/* ---------- hero ---------- */
+
+.hero {
+  padding-top: clamp(140px, 20vh, 220px);
+  padding-bottom: clamp(60px, 10vw, 120px);
+}
+.hero-kicker {
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--papel-tenue);
+  margin: 0 0 28px;
+}
+.hero-titulo {
+  font-family: var(--display);
+  font-weight: 700;
+  /* Tipografía display grande, pero con tope: pasado cierto punto una sola
+   * palabra ocupa el ancho entero en móvil y el titular se vuelve ilegible. */
+  font-size: clamp(42px, 8.2vw, 104px);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  margin: 0 0 32px;
+  max-width: 15ch;
+}
+.hero-titulo em {
+  font-style: italic;
+  color: var(--acento);
+}
+.hero-bajada {
+  font-size: clamp(17px, 2.1vw, 21px);
+  color: var(--papel-tenue);
+  max-width: 52ch;
+  margin: 0 0 44px;
+}
+.hero-acciones { display: flex; flex-wrap: wrap; gap: 14px; }
+
+/* ---------- problema ---------- */
+
+.problema { border-top: 1px solid var(--linea); }
+.problema-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: clamp(24px, 5vw, 64px);
+}
+.declaracion {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(22px, 3.1vw, 34px);
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  margin: 0 0 28px;
+}
+.parrafo {
+  color: var(--papel-tenue);
+  max-width: 60ch;
+  margin: 0;
+}
+@media (max-width: 800px) {
+  .problema-grid { grid-template-columns: 1fr; }
+}
+
+/* ---------- qué incluye ---------- */
+
+.incluye { border-top: 1px solid var(--linea); }
+.tarjetas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 1px;
+  background: var(--linea);
+  border: 1px solid var(--linea);
+}
+.tarjeta {
+  background: var(--tinta);
+  padding: clamp(28px, 3.4vw, 44px);
+  transition: background 0.3s ease;
+}
+.tarjeta:hover { background: var(--tinta-suave); }
+.tarjeta-num {
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--acento);
+}
+.tarjeta h3 {
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 18px 0 12px;
+}
+.tarjeta p {
+  margin: 0;
+  color: var(--papel-tenue);
+  font-size: 16px;
+}
+
+/* ---------- pasos ---------- */
+
+.pasos { border-top: 1px solid var(--linea); }
+.pasos-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1px;
+  background: var(--linea);
+  border-top: 1px solid var(--linea);
+}
+.paso {
+  background: var(--tinta);
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: clamp(16px, 3vw, 40px);
+  padding: clamp(28px, 3.4vw, 44px) 0;
+  align-items: start;
+}
+.paso-num {
+  font-family: var(--display);
+  font-size: clamp(40px, 5vw, 64px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--linea);
+}
+.paso h3 {
+  font-family: var(--display);
+  font-size: clamp(20px, 2.4vw, 26px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+}
+.paso p {
+  margin: 0;
+  color: var(--papel-tenue);
+  max-width: 58ch;
+}
+@media (max-width: 620px) {
+  .paso { grid-template-columns: 1fr; gap: 8px; }
+}
+
+/* ---------- prueba social ---------- */
+
+.confian { border-top: 1px solid var(--linea); }
+.logos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: clamp(20px, 3vw, 36px);
+}
+.logo-item a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  text-align: center;
+  padding: 20px 8px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.logo-item a:hover { border-color: var(--linea); background: var(--tinta-suave); }
+.logo-item img {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--tinta-suave);
+}
+.logo-inicial {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: var(--tinta-suave);
+  border: 1px solid var(--linea);
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--acento);
+}
+.logo-nombre {
+  font-size: 14px;
+  color: var(--papel-tenue);
+}
+
+/* ---------- cierre ---------- */
+
+.cierre {
+  border-top: 1px solid var(--linea);
+  text-align: center;
+}
+.cierre-titulo {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(40px, 7.5vw, 92px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  margin: 0 0 22px;
+}
+.cierre-bajada {
+  font-size: clamp(17px, 2vw, 20px);
+  color: var(--papel-tenue);
+  max-width: 46ch;
+  margin: 0 auto 40px;
+}
+.cierre-alterna {
+  margin: 28px 0 0;
+  font-size: 15px;
+  color: var(--papel-tenue);
+}
+.cierre-alterna a { color: var(--acento); }
+
+/* ---------- pie ---------- */
+
+.pie {
+  border-top: 1px solid var(--linea);
+  max-width: var(--borde-max);
+  margin: 0 auto;
+  padding: 40px clamp(20px, 5vw, 56px) 56px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 32px;
+  align-items: center;
+  justify-content: space-between;
+}
+.pie-marca {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.pie-links { display: flex; flex-wrap: wrap; gap: 24px; }
+.pie-links a {
+  font-size: 15px;
+  color: var(--papel-tenue);
+  text-decoration: none;
+}
+.pie-links a:hover { color: var(--acento); }
+
+/* ---------- revelado al hacer scroll ---------- */
+
+/* El estado oculto se aplica SÓLO si hay JS, y por eso cuelga de `.js`, que
+ * pone un script mínimo en el <head>.
+ *
+ * Al revés —ocultar por defecto y revelar con JS— la landing entera queda en
+ * blanco si el script no llega: un bloqueador, un error de red, un navegador
+ * viejo. Es la puerta de entrada del negocio; tiene que leerse aunque el
+ * adorno no cargue. La clase se agrega de forma síncrona en el <head> y no
+ * desde este archivo diferido, para que el contenido no llegue a dibujarse
+ * antes de esconderse.
+ */
+.js .reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.js .reveal.visible { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .js .reveal { opacity: 1; transform: none; transition: none; }
+  .boton:hover { transform: none; }
+}
