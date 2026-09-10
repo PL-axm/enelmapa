@@ -229,6 +229,12 @@ Note: `db/enelmapa.db` is a leftover SQLite file from an earlier iteration and i
 
 Three layers guard it, in `services/imageUpload.js` and `app.js`: multer's `fileFilter` rejects by declared mimetype, then the written file's **magic bytes** are checked and it is deleted if they don't match an image (the declared type is attacker-controlled; the first bytes are the actual content), and `/uploads` is served with `X-Content-Type-Options: nosniff` so nothing that slipped through gets interpreted as HTML or JS — it shares an origin with the panel.
 
+**`uploads/` is production data, not code.** It holds photos the business owners uploaded, it is gitignored for that reason, and **no deploy may touch it**. The cron deploy works by `git reset --hard`, which leaves ignored files alone — that is the property that makes it safe, not an accident.
+
+Never deploy by zipping the working tree. A zip of the directory bypasses `.gitignore` and carries the development machine's `uploads/` over production's. That happened on 2026-09-09 and destroyed every business's images; the symptom only surfaced a day later, as menus with every photo broken, because the database still pointed at paths that no longer existed. What makes it treacherous is that **business ids do not match between local and production** — Caficultor is `1` locally and `5` in production — so the upload lands in folders that correspond to nothing, while the filenames match closely enough to look fine.
+
+It was recoverable only because the old directory had been *renamed* rather than deleted. Restoring means replacing `uploads/` **whole**: folders `1` and `2` exist on both sides and are different businesses, so merging quietly leaves the wrong files in place.
+
 ### Deployment
 
 cPanel + CloudLinux Node.js Selector (mod_passenger), not a container/PM2 setup. Passenger serves the app directly from the `.htaccess` in the app root:
