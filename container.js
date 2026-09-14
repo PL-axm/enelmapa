@@ -5,6 +5,7 @@ const productRepository = require('./repositories/productRepository');
 const businessRepository = require('./repositories/businessRepository');
 const userRepository = require('./repositories/userRepository');
 const locationRepository = require('./repositories/locationRepository');
+const saludRepository = require('./repositories/saludRepository');
 const authService = require('./services/authService');
 const businessService = require('./services/businessService');
 const locationService = require('./services/locationService');
@@ -37,8 +38,9 @@ function buildRepos(db) {
   const businesses = businessRepository(db);
   const users = userRepository(db);
   const locations = locationRepository(db);
+  const salud = saludRepository(db);
 
-  return { categories, products, businesses, users, locations };
+  return { categories, products, businesses, users, locations, salud };
 }
 
 function createContainer(config) {

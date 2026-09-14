@@ -12,6 +12,10 @@ const createSuperadminRouter = require('./routes/superadmin');
 const createApiRouter = require('./routes/api/index');
 const { getSubdomain } = require('./services/subdomain');
 
+// Más de esto y la base se considera caída. Un monitor externo suele esperar
+// 30 segundos; responder un 503 claro mucho antes es mejor que un timeout mudo.
+const SALUD_TIEMPO_MAXIMO_MS = 2000;
+
 // Antes este archivo creaba la app al importarse y cada router se traía el
 // pool y la config por su cuenta con un `require` a nivel de módulo. Ahora
 // recibe las dependencias y las reparte: cada pieza declara en su firma lo
@@ -73,6 +77,38 @@ function createApp({ repos, services, config, sessionStore, logger }) {
   app.use('/api', createApiRouter({ repos, services }));
 
   app.get('/s/:slug', tenantMiddleware, publicRoutes);
+
+  // Chequeo de salud para el monitor externo. La caída del 2026-09-09 la
+  // descubrió el dueño, no un aviso, y el panel de cPanel decía "started"
+  // mientras el sitio respondía error. Esto mide lo que importa: que Node
+  // atienda Y que la base conteste.
+  //
+  // - Nunca lanza: si la base falla, 503. Un chequeo de salud que tira el
+  //   proceso sería el colmo.
+  // - Tiene tiempo máximo: una base colgada dejaría la petición esperando y
+  //   reteniendo conexiones del pool, justo cuando menos sobran.
+  // - No dice por qué falló. Es público: el detalle va al log, no a la
+  //   respuesta.
+  // - `no-store`: un proxy o el caché de nginx no deben responder "ok" por un
+  //   sitio que ya se cayó.
+  app.get('/salud', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    let temporizador;
+    try {
+      await Promise.race([
+        repos.salud.ping(),
+        new Promise((_, rechazar) => {
+          temporizador = setTimeout(() => rechazar(new Error('la base no respondió a tiempo')), SALUD_TIEMPO_MAXIMO_MS);
+        })
+      ]);
+      res.json({ estado: 'ok' });
+    } catch (err) {
+      logger.warn('Chequeo de salud fallido', { motivo: err.message });
+      res.status(503).json({ estado: 'error' });
+    } finally {
+      clearTimeout(temporizador);
+    }
+  });
 
   // La raíz del dominio es la landing de la plataforma, no un menú: acá no hay
   // tenant que resolver. Los subdominios se atajaron más arriba y `www` queda

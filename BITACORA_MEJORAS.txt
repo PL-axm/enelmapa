@@ -206,7 +206,47 @@ ESTADO: código terminado y probado en local. No está en producción.
  PASO 3 — ENDPOINT /salud
 ================================================================================
 
-ESTADO: pendiente
+PROBLEMA
+  La caída del 9 de septiembre la descubrió el dueño, no una alerta. El panel
+  de cPanel decía "started" mientras el sitio respondía error.
+
+SOLUCIÓN
+  GET /salud responde 200 {"estado":"ok"} si Node atiende Y la base contesta,
+  y 503 {"estado":"error"} si no. Un monitor externo gratuito lo consulta cada
+  pocos minutos y avisa por correo (se configura en el PASO 5).
+
+VALIDACIÓN CONTRA INCIDENTES
+  [I-1] Ruta nueva y aditiva: no modifica ninguna existente. Si la base falla
+        responde 503; nunca lanza ni tira el proceso.
+  RIESGO PROPIO
+        Con la base colgada, una consulta sin límite dejaría la petición
+        esperando y reteniendo conexiones de un pool de 10. Tiempo máximo: 2 s.
+  SEGURIDAD
+        No devuelve el motivo del error (va al log), ni versión, ni datos.
+        No crea sesión: el monitor no llena la tabla `sessions`.
+        Cache-Control: no-store, para que ningún caché responda "ok" por un
+        sitio caído.
+
+ARCHIVOS
+  repositories/saludRepository.js   ping() con SELECT 1. En repositories/
+                                    porque el proyecto no admite SQL fuera de
+                                    esa capa.
+  container.js                      registra repos.salud
+  app.js                            la ruta /salud y su tiempo máximo
+  tests/integration/salud.test.js   (+5 tests)
+
+VERIFICACIÓN
+  - Base respondiendo: 200.
+  - Base caída: 503, sin el mensaje de error en la respuesta.
+  - Base colgada: 503 en menos de 5 s (no espera indefinidamente).
+  - Sin Set-Cookie y con Cache-Control: no-store.
+  - Responde también desde el subdominio de un negocio.
+  - Suite completa: 485 tests en verde.
+
+CÓMO REVERTIR
+  Revertir el commit. Nada depende de esta ruta salvo el monitor externo.
+
+ESTADO: código terminado y probado en la rama. No está en producción.
 
 
 ================================================================================
