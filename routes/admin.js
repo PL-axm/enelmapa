@@ -15,7 +15,7 @@ function createAdminRouter({ repos, services, config }) {
   const loginLimiter = createLoginLimiter({
     windowMs: config.rateLimit.windowMs,
     max: config.rateLimit.loginMax,
-    mensaje: 'Demasiados intentos de inicio de sesión. Esperá unos minutos.'
+    mensaje: 'Demasiados intentos de inicio de sesión. Espera unos minutos.'
   });
 
   router.get('/login', (req, res) => {

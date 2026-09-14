@@ -137,7 +137,7 @@ async function apiFetch(url, options) {
 
     // La sesión bajo Passenger se cae sola a veces (hallazgo S9, pendiente).
     // Sin este caso, el usuario ve "No encontrado" y no entiende por qué.
-    if (res.status === 401) mensaje = 'Tu sesión expiró. Volvé a iniciar sesión.';
+    if (res.status === 401) mensaje = 'Tu sesión expiró. Vuelve a iniciar sesión.';
 
     box.textContent = mensaje;
     box.style.display = '';

@@ -71,7 +71,13 @@ describe('errorHandler', () => {
 
     expect(res.statusCode).toBe(404);
     expect(res.renderedView).toBe('404');
-    expect(res.renderedLocals).toEqual({ message: 'Negocio no encontrado' });
+    // La plantilla recibe el código real: antes mostraba "404" fijo para
+    // cualquier error, incluido el 429 de demasiados intentos.
+    expect(res.renderedLocals).toEqual({
+      message: 'Negocio no encontrado',
+      statusCode: 404,
+      titulo: 'No encontrado'
+    });
   });
 
   test('un error inesperado es 500 y se loguea con stack', () => {

@@ -70,7 +70,7 @@ function loadConfig(env = process.env) {
     throw new Error(
       'SESSION_SECRET es obligatoria cuando NODE_ENV=production. ' +
       'Sin ella las sesiones se firmarían con el secreto por defecto del repo. ' +
-      'Generá una con: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+      'Genera una con: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
     );
   }
 

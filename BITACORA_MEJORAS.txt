@@ -412,6 +412,68 @@ ESTADO: pendiente — requiere acciones del dueño en cPanel.
 
 
 ================================================================================
+ REGISTRO DE EJECUCIÓN DEL PASO 5 — 2026-09-14
+================================================================================
+
+5.0  Respaldo del .htaccess
+     La primera copia quedó en 0 bytes (se creó un archivo vacío con el
+     nombre en lugar de copiar el original). Detectado en la captura del File
+     Manager y rehecho copiando el contenido: 337 bytes, igual al original.
+     LECCIÓN: después de un respaldo, comparar el tamaño con el original.
+
+5.1  Contraseña del superadmin — intento con SUPER_PASS_HASH
+     - Hash generado con scripts/generar-hash-superadmin.js y cargado en cPanel.
+     - Guardar + reiniciar: menús OK.
+     - El login con la contraseña nueva falló varias veces y se agotó el límite
+       de intentos (5 fallidos cada 15 minutos por IP).
+     - Vuelta atrás: se borró SUPER_PASS_HASH. Menús OK.
+     - Diagnóstico local con scripts/verificar-hash-superadmin.js: hash y
+       contraseña COINCIDEN.
+     - Primera conclusión (INCORRECTA): cPanel altera los `$` del hash.
+       No quedó demostrado. Ver abajo.
+
+5.1  Contraseña del superadmin — plan B con SUPER_PASS
+     - Contraseña de 24 caracteres generada con base64url (sin `$` ni símbolos)
+       cargada en SUPER_PASS. Menús OK.
+     - El login volvió a fallar. En la captura el campo de contraseña tenía
+       9 puntos: el largo de la contraseña por defecto, no de la nueva.
+       Chrome autocompletaba la contraseña vieja guardada para el sitio.
+     - Eso invalida la conclusión anterior: el hash pudo estar bien y fallar
+       por el mismo autocompletado. Queda SIN CONFIRMAR si cPanel altera `$`.
+     - La contraseña quedó visible en una captura de las variables: hay que
+       regenerarla cuando el acceso esté confirmado.
+     - Siguiente verificación: un único intento con curl (sin navegador ni
+       autocompletado), pasada la ventana del límite de intentos.
+     LECCIONES:
+       - Ante un login que falla tras cambiar una contraseña, descartar primero
+         el autocompletado: contar los caracteres del campo.
+       - Cada intento fallido gasta cupo del límite. Diagnosticar fuera del
+         formulario (script local o curl) antes de seguir probando.
+       - No afirmar una causa por eliminación sin haber descartado las demás.
+
+CORRECCIONES QUE SALIERON DE ESTE PASO (en la rama)
+  views/404.ejs + middleware/errorHandler.js
+      La plantilla mostraba "404" fijo para TODOS los errores. El bloqueo por
+      demasiados intentos (429) se veía como "404", y en producción se
+      interpretó como una página inexistente. Ahora muestra el código real.
+      Validación: esta plantilla atiende todos los errores del sitio; si falla
+      al renderizar, cualquier error se vuelve una respuesta rota. Se usan
+      `typeof` para que, sin datos, se comporte exactamente como antes.
+      Tests: rate-limit (el 429 muestra 429) y errorHandler (datos de la vista).
+  Voseo en mensajes visibles (6):
+      routes/admin.js, routes/superadmin.js, errors/index.js (2),
+      config/index.js, views/partials/admin-head.ejs
+      ("Esperá", "No tenés permiso", "Generá", "Volvé a iniciar sesión").
+      La revisión anterior sólo había buscado en views/ y con una lista de
+      palabras incompleta.
+  routes/superadmin.js
+      El mensaje del bloqueo ahora menciona también SUPER_PASS, que es la vía
+      que se está usando en este hosting.
+
+  Suite completa: 485 tests en verde.
+
+
+================================================================================
  FUERA DE ESTA TANDA (anotado para después)
 ================================================================================
   - Borrar enelmapa.co-old, uploads-malas y enelmapa-backup-2026-08-17: SÓLO

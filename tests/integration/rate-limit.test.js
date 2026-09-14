@@ -56,6 +56,12 @@ describe('rate limiting de los logins (S5)', () => {
     const bloqueado = await intentarLogin(app, 'mala');
     expect(bloqueado.status).toBe(429);
     expect(bloqueado.text).toContain('Demasiados intentos');
+
+    // La plantilla de error tenía el "404" escrito fijo: esta pantalla se veía
+    // como una página inexistente justo cuando alguien intentaba entrar a su
+    // panel, y así se interpretó en producción.
+    expect(bloqueado.text).toContain('<h1>429</h1>');
+    expect(bloqueado.text).not.toContain('<h1>404</h1>');
   });
 
   // Si contara también los aciertos, una oficina detrás de una sola IP se

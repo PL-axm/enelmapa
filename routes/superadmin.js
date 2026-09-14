@@ -31,7 +31,8 @@ function validarFormulario(schema, vista) {
 }
 
 const MENSAJE_BLOQUEADO =
-  'El acceso de superadmin está deshabilitado hasta configurar una contraseña segura (SUPER_PASS_HASH).';
+  'El acceso de superadmin está deshabilitado hasta configurar una contraseña segura ' +
+  '(SUPER_PASS_HASH, o una SUPER_PASS distinta de la contraseña por defecto).';
 
 function createSuperadminRouter({ repos, services, config }) {
   const router = express.Router();
@@ -58,7 +59,7 @@ function createSuperadminRouter({ repos, services, config }) {
   const loginLimiter = createLoginLimiter({
     windowMs: config.rateLimit.windowMs,
     max: config.rateLimit.superadminMax,
-    mensaje: 'Demasiados intentos. Esperá unos minutos.'
+    mensaje: 'Demasiados intentos. Espera unos minutos.'
   });
 
   router.get('/login', (req, res) => {
