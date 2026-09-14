@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# No se sube nada a main sin pasar la suite.
+#
+# main se despliega solo en menos de 5 minutos (deploy/deploy.sh) y el deploy
+# no corre los tests: sin esto, un push roto llega a producción sin que nada lo
+# frene. `npm test` ya era "el único gate del proyecto" según CLAUDE.md, pero
+# dependía de acordarse.
+#
+# Activación, una vez por clon:
+#   git config core.hooksPath .githooks
+#
+# Emergencia real (producción caída y el arreglo no puede esperar la suite):
+#   git push --no-verify
+# Queda como decisión consciente, no como costumbre.
+
+set -uo pipefail
+
+RAMA_QUE_DESPLIEGA="refs/heads/main"
+CERO="0000000000000000000000000000000000000000"
+
+# git pasa por stdin una línea por referencia empujada:
+#   <ref local> <sha local> <ref remota> <sha remota>
+SUBE_A_MAIN=""
+SHA_A_SUBIR=""
+while read -r ref_local sha_local ref_remota sha_remota; do
+  if [ "$ref_remota" = "$RAMA_QUE_DESPLIEGA" ] && [ "$sha_local" != "$CERO" ]; then
+    SUBE_A_MAIN=1
+    SHA_A_SUBIR="$sha_local"
+  fi
+done
+
+# Las ramas de trabajo no despliegan: no se las hace esperar un minuto.
+if [ -z "$SUBE_A_MAIN" ]; then
+  exit 0
+fi
+
+echo "pre-push: se está subiendo a main, que se despliega a producción."
+
+# Los tests corren sobre los archivos del disco, no sobre el commit que se
+# sube. Tienen que ser lo mismo, o el verde no dice nada.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "pre-push: hay cambios sin commitear. Los tests correrían con ellos, pero el"
+  echo "          push sube el commit sin ellos. Haz commit o 'git stash' y vuelve a intentar."
+  exit 1
+fi
+
+if [ "$(git rev-parse HEAD)" != "$SHA_A_SUBIR" ]; then
+  echo "pre-push: lo que se sube a main ($(git rev-parse --short "$SHA_A_SUBIR")) no es lo que"
+  echo "          tienes en disco ($(git rev-parse --short HEAD)). Los tests probarían otra cosa."
+  echo "          Haz 'git checkout main' antes de subir."
+  exit 1
+fi
+
+echo "pre-push: corriendo npm test (alrededor de un minuto)..."
+if ! npm test --silent; then
+  echo ""
+  echo "pre-push: LA SUITE FALLÓ. No se subió nada a main, así que producción no cambió."
+  exit 1
+fi
+
+echo "pre-push: suite en verde, se sube."
+exit 0

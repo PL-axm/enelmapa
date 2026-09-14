@@ -49,8 +49,25 @@ function createErrorHandler({ config, logger }) {
       return res.status(statusCode).json({ ok: false, error: message });
     }
 
-    res.status(statusCode).render('404', { message });
+    // La plantilla se llama 404 por historia, pero muestra TODOS los errores.
+    // Tenía el "404" escrito fijo: un 429 por demasiados intentos de login se
+    // veía como "404 — Demasiados intentos", y pasó por una página inexistente
+    // en el momento en que alguien intentaba entrar a su propio panel.
+    res.status(statusCode).render('404', {
+      message,
+      statusCode,
+      titulo: TITULOS[statusCode] || (isServerError ? 'Error' : 'Algo salió mal')
+    });
   };
 }
+
+const TITULOS = {
+  400: 'Solicitud inválida',
+  401: 'Sesión requerida',
+  403: 'Acceso denegado',
+  404: 'No encontrado',
+  429: 'Demasiados intentos',
+  500: 'Error'
+};
 
 module.exports = { createErrorHandler, notFoundHandler, wantsJson };

@@ -1,0 +1,492 @@
+================================================================================
+ BITÁCORA DE MEJORAS — SEGURIDAD Y OPERACIÓN
+ Proyecto: enelmapa.co
+ Rama: feature/mejoras_seguridad_operacion
+ Inicio: 2026-09-14
+================================================================================
+
+Este archivo documenta, paso a paso, cada cambio de esta tanda: qué se hizo, por
+qué, qué riesgo se evaluó antes de hacerlo, cómo se verificó y cómo revertirlo.
+
+IMPORTANTE: este archivo está en un repositorio PÚBLICO. Nunca se escriben aquí
+contraseñas, hashes, secretos ni credenciales de ningún tipo.
+
+
+--------------------------------------------------------------------------------
+ REGLA DE ESTA TANDA: VALIDAR CONTRA LOS INCIDENTES ANTERIORES
+--------------------------------------------------------------------------------
+
+Antes de cada cambio se responde una pregunta: ¿puede repetir alguno de estos?
+
+  [I-1] CAÍDA POR CONFIGURACIÓN (2026-09-09)
+        El .htaccess del repo pisó el de producción; Node arrancó sin variables
+        de entorno, no pudo conectar a MySQL y murió al iniciar. Los menús de
+        todos los clientes quedaron caídos. Lección: un problema de
+        configuración NUNCA debe impedir que la plataforma arranque, salvo que
+        arrancar sea peor que no hacerlo.
+
+  [I-2] PÉRDIDA DE IMÁGENES (2026-09-09)
+        Se desplegó comprimiendo la carpeta local y se pisó uploads/ de
+        producción. Lección: nada toca uploads/ ni se despliega fuera de git.
+        Antes de borrar o sobrescribir algo en el servidor, se renombra.
+
+  [I-3] CÓDIGO QUE NO CORRE (2026-09-09)
+        tmp/restart.txt no reinicia Node en este hosting; el código en disco
+        y el que corre divergieron sin aviso. Lección: después de cualquier
+        cambio en el servidor, verificar desde afuera que el cambio está vivo.
+
+Además: todo cambio va primero a una rama, pasa `npm test` completo y se
+verifica en local antes de llegar a main. Main = producción en 5 minutos.
+
+
+--------------------------------------------------------------------------------
+ PLAN
+--------------------------------------------------------------------------------
+
+  Paso 1  Superadmin con contraseña por defecto  → bloquear su login
+  Paso 2  Respaldo automático de base de datos e imágenes
+  Paso 3  Endpoint /salud para monitoreo externo
+  Paso 4  Hook pre-push: no se sube nada a main sin pasar los tests
+  Paso 5  Pasos manuales en cPanel (los hace el dueño, con checklist)
+
+Los pasos 1 a 4 son cambios de código en la rama y NO tocan producción hasta
+el merge. El paso 5 tiene un orden obligatorio, explicado en su sección.
+
+
+================================================================================
+ PASO 1 — SUPERADMIN CON CONTRASEÑA POR DEFECTO
+================================================================================
+
+PROBLEMA
+  En las variables de entorno de producción el superadmin usa los valores
+  por defecto de config/index.js (correo y contraseña que están publicados en
+  el repositorio). Cualquiera que lea el repo puede entrar a /superadmin y
+  borrar todos los negocios. El rate limit no protege: no hay nada que adivinar.
+
+PRIMERA IDEA, DESCARTADA
+  Que loadConfig lance un error en producción con la contraseña por defecto,
+  igual que ya hace con SESSION_SECRET.
+
+VALIDACIÓN CONTRA INCIDENTES → FALLA [I-1]
+  Producción HOY tiene la contraseña por defecto. Al desplegar, Node no
+  arrancaría y se caerían los menús de todos los clientes por un problema que
+  sólo afecta al acceso del superadmin. Es exactamente la caída del 9 de
+  septiembre, provocada a propósito.
+
+  SESSION_SECRET sí justifica no arrancar: sin él se firmarían TODAS las
+  sesiones con un secreto público. La contraseña del superadmin compromete una
+  sola puerta, y esa puerta se puede cerrar sin apagar el edificio.
+
+SOLUCIÓN ELEGIDA
+  En producción, si el superadmin no tiene SUPER_PASS_HASH y su contraseña es
+  la de por defecto, el login de /superadmin queda BLOQUEADO con un mensaje que
+  explica cómo habilitarlo. Todo lo demás —menús, landing, panel de los
+  negocios— sigue funcionando igual.
+
+  Además se agrega un script local para generar el hash sin escribir la
+  contraseña en la terminal ni en el chat.
+
+ORDEN OBLIGATORIO AL LLEGAR A PRODUCCIÓN
+  Si se despliega este cambio antes de configurar el hash, el dueño queda
+  afuera de su propio superadmin. Por eso:
+    a) PRIMERO se configura SUPER_PASS_HASH en cPanel (el código actual en
+       producción YA lo soporta) y se verifica el login.
+    b) DESPUÉS se mergea y despliega el bloqueo.
+
+SEGUNDA VALIDACIÓN, DURANTE LA IMPLEMENTACIÓN
+  Las sesiones viven en MySQL y sobreviven a un deploy. Si alguien entró como
+  superadmin con la contraseña publicada ANTES del bloqueo, bloquear sólo el
+  login lo dejaría adentro. Por eso el bloqueo cubre todo /superadmin y le
+  quita la marca de superadmin a cualquier sesión que llegue.
+
+ARCHIVOS
+  config/index.js
+      Nuevo campo config.superadmin.bloqueado. Es true sólo si: producción,
+      sin SUPER_PASS_HASH, y contraseña igual a la por defecto.
+  routes/superadmin.js
+      Si está bloqueado, TODO /superadmin responde 403 con un mensaje que
+      explica cómo habilitarlo, y retira la marca isSuper de la sesión.
+  server.js
+      Al arrancar avisa en el log (advertencia, no error) si el acceso está
+      bloqueado, o si SUPER_PASS_HASH no tiene formato bcrypt válido. Lo
+      segundo cubre un riesgo propio de cPanel: el hash está lleno de `$` y,
+      si algo lo recorta al guardarlo, el síntoma sería "credenciales
+      incorrectas" con la contraseña correcta.
+  scripts/generar-hash-superadmin.js
+      Pide la contraseña por teclado sin mostrarla, dos veces, mínimo 12
+      caracteres, verifica el hash antes de entregarlo e imprime sólo el hash.
+      No acepta la contraseña como argumento: quedaría en el historial.
+  tests/unit/config.test.js                    (+5 tests)
+  tests/integration/superadmin-bloqueo.test.js (+6 tests)
+
+VERIFICACIÓN
+  - Con el bloqueo: login 403, credenciales por defecto no abren sesión.
+  - Una sesión de superadmin abierta antes del bloqueo pierde el acceso, y
+    no lo recupera aunque se quite el bloqueo.
+  - Con el bloqueo activo siguen respondiendo: la landing, el menú de un
+    negocio y el login del panel de negocios. (Esta es la validación contra
+    [I-1] convertida en test.)
+  - loadConfig NO lanza con la contraseña por defecto en producción.
+  - Suite completa: 480 tests en verde.
+
+CÓMO REVERTIR
+  Revertir el commit. Alternativa sin deploy: configurar SUPER_PASS_HASH en
+  cPanel levanta el bloqueo de inmediato tras reiniciar Node.
+
+PENDIENTE (manual, ver PASO 5)
+  Configurar SUPER_PASS_HASH en cPanel ANTES de mergear esta rama.
+
+ESTADO: código terminado y probado en la rama. No está en producción.
+
+
+================================================================================
+ PASO 2 — RESPALDO AUTOMÁTICO
+================================================================================
+
+PROBLEMA
+  No existía ningún respaldo de la base de datos: JetBackup mostraba copias
+  de diciembre de 2025 y el proyecto no tenía ningún mysqldump. Las imágenes
+  se salvaron el 9 de septiembre sólo porque la carpeta se renombró.
+
+SOLUCIÓN
+  deploy/respaldo.sh, ejecutado por cron una vez por noche:
+    - Base de datos: mysqldump comprimido, verificado, con 14 días de rotación.
+    - Imágenes: copia acumulativa de uploads/ (agrega, nunca borra ni pisa).
+
+VALIDACIÓN CONTRA INCIDENTES
+  [I-2] Sólo LEE uploads/ de la app; nunca escribe ahí. Los respaldos van en
+        /home/<usuario>/respaldos-enelmapa: fuera de public_html (no
+        alcanzable por web) y fuera de la app (no lo toca `git reset`).
+  [I-1] No toca .htaccess, ni variables de entorno, ni reinicia Node.
+        --single-transaction no bloquea las tablas InnoDB durante el volcado.
+  RIESGO NUEVO, PROPIO DE ESTE PASO
+        Si los respaldos llenan la cuota de disco de la cuenta, MySQL y las
+        subidas de fotos empiezan a fallar: eso SÍ dañaría el sitio. Por eso
+        hay un tope (1500 MB): pasado el tope no respalda y lo registra.
+
+SALVAGUARDAS DEL SCRIPT
+  - Se niega si el destino queda dentro de public_html o de la app.
+  - Se niega si no existen las credenciales en ~/.my.cnf.
+  - Credenciales en ~/.my.cnf (permisos 600), nunca en la línea de comandos,
+    donde quedarían visibles en la lista de procesos.
+  - El volcado se escribe a un archivo .parcial y sólo se renombra cuando
+    pasó dos verificaciones: gzip íntegro y la línea final "Dump completed".
+  - Los respaldos viejos se borran SÓLO después de uno nuevo verificado.
+  - Nombre con fecha y hora hasta los segundos: un respaldo nunca pisa a otro.
+
+PRUEBA (local, con un mysqldump simulado)
+  1. mysqldump falla        → salida 1, respaldo viejo intacto, sin parciales
+  2. volcado incompleto     → salida 1, respaldo viejo intacto, nada nuevo
+  3. volcado correcto       → salida 0, archivo verificado, viejo rotado
+  4. copia de imágenes      → foto borrada en la app sigue en la copia;
+                              foto pisada en la app conserva su original;
+                              foto nueva copiada; la app no se modifica
+  5. destino dentro de app  → salida 1 y NADA escrito en la app
+  6. sin credenciales       → salida 1
+  7. tope superado          → salida 1, ningún respaldo creado
+
+  HALLAZGO DE LA PRUEBA: en la primera versión, el caso 5 se negaba a
+  respaldar, pero ya había creado la carpeta dentro de la app, porque el mkdir
+  estaba antes de la verificación. Se corrigió moviendo la verificación al
+  principio. Sin esta prueba, el bug habría llegado al servidor.
+
+PENDIENTE (manual, ver PASO 5)
+  - Crear ~/.my.cnf con las credenciales (fuera de public_html, permisos 600).
+  - Programar el cron nocturno.
+  - Correrlo una vez a mano y revisar respaldo.log.
+  - Probar una restauración en una base de prueba (no en la de producción).
+
+CÓMO REVERTIR
+  Eliminar el cron. El script no modifica nada fuera de su carpeta de destino.
+
+ESTADO: código terminado y probado en local. No está en producción.
+
+
+================================================================================
+ PASO 3 — ENDPOINT /salud
+================================================================================
+
+PROBLEMA
+  La caída del 9 de septiembre la descubrió el dueño, no una alerta. El panel
+  de cPanel decía "started" mientras el sitio respondía error.
+
+SOLUCIÓN
+  GET /salud responde 200 {"estado":"ok"} si Node atiende Y la base contesta,
+  y 503 {"estado":"error"} si no. Un monitor externo gratuito lo consulta cada
+  pocos minutos y avisa por correo (se configura en el PASO 5).
+
+VALIDACIÓN CONTRA INCIDENTES
+  [I-1] Ruta nueva y aditiva: no modifica ninguna existente. Si la base falla
+        responde 503; nunca lanza ni tira el proceso.
+  RIESGO PROPIO
+        Con la base colgada, una consulta sin límite dejaría la petición
+        esperando y reteniendo conexiones de un pool de 10. Tiempo máximo: 2 s.
+  SEGURIDAD
+        No devuelve el motivo del error (va al log), ni versión, ni datos.
+        No crea sesión: el monitor no llena la tabla `sessions`.
+        Cache-Control: no-store, para que ningún caché responda "ok" por un
+        sitio caído.
+
+ARCHIVOS
+  repositories/saludRepository.js   ping() con SELECT 1. En repositories/
+                                    porque el proyecto no admite SQL fuera de
+                                    esa capa.
+  container.js                      registra repos.salud
+  app.js                            la ruta /salud y su tiempo máximo
+  tests/integration/salud.test.js   (+5 tests)
+
+VERIFICACIÓN
+  - Base respondiendo: 200.
+  - Base caída: 503, sin el mensaje de error en la respuesta.
+  - Base colgada: 503 en menos de 5 s (no espera indefinidamente).
+  - Sin Set-Cookie y con Cache-Control: no-store.
+  - Responde también desde el subdominio de un negocio.
+  - Suite completa: 485 tests en verde.
+
+CÓMO REVERTIR
+  Revertir el commit. Nada depende de esta ruta salvo el monitor externo.
+
+ESTADO: código terminado y probado en la rama. No está en producción.
+
+
+================================================================================
+ PASO 4 — HOOK PRE-PUSH
+================================================================================
+
+PROBLEMA
+  main se despliega solo en menos de 5 minutos y el deploy no corre los
+  tests. Un push roto llegaba a producción sin ningún freno.
+
+SOLUCIÓN
+  .githooks/pre-push: al subir a main corre `npm test`; si falla, el push no
+  se hace y producción no cambia.
+
+VALIDACIÓN
+  [I-1..I-3] Es sólo local: no toca el servidor.
+  RIESGO PROPIO: un verde falso. Los tests corren sobre los archivos del
+  disco, no sobre el commit que se sube. El hook se niega si:
+    - hay cambios sin commitear, o
+    - lo que se sube a main no es el HEAD actual (por ejemplo, estando en
+      otra rama y ejecutando `git push origin main`).
+
+ARCHIVOS
+  .githooks/pre-push   el hook
+  .gitattributes       los hooks se guardan con finales de línea LF: no
+                       tienen extensión y la regla de *.sh no los alcanzaba
+
+PRUEBA
+  A. push de una rama de trabajo        → no corre nada, sale 0
+  B. push a main con cambios pendientes → se niega
+  C. push a main de otro commit         → se niega
+  D. borrar la rama remota              → no corre tests
+  E. push a main, árbol limpio          → corre la suite (485 verde), sale 0
+  F. push a main con la suite fallando  → se niega, "producción no cambió"
+
+ACTIVACIÓN
+  Ya activado en este equipo. En cualquier clon nuevo:
+      git config core.hooksPath .githooks
+
+EMERGENCIA
+  `git push --no-verify` salta el hook. Sólo para producción caída y un
+  arreglo que no puede esperar un minuto.
+
+ESTADO: terminado y activo en este equipo.
+
+
+================================================================================
+ PASO 5 — PASOS MANUALES EN CPANEL (EN ESTE ORDEN)
+================================================================================
+
+El orden no es opcional: cada paso deja el sitio estable antes del siguiente,
+y cada uno trae cómo volver atrás. Después de CADA paso se verifica que los
+menús respondan ANTES de verificar lo que se cambió [I-1, I-3].
+
+VERIFICACIÓN BÁSICA (se repite después de cada paso)
+  [ ] https://enelmapa.co                  carga la landing
+  [ ] https://enelmapa.co/s/caficultor     carga el menú con fotos
+  [ ] https://caficultor.enelmapa.co       carga el menú
+
+--------------------------------------------------------------------------------
+ 5.0  RESPALDO DEL .htaccess ANTES DE TOCAR CPANEL
+--------------------------------------------------------------------------------
+  [ ] En File Manager, dentro de public_html/enelmapa.co, COPIAR .htaccess
+      como .htaccess.antes-paso5
+  Por qué: guardar la configuración de la app en cPanel reescribe ese
+  archivo, y es el que tumbó el sitio el 9 de septiembre.
+
+--------------------------------------------------------------------------------
+ 5.1  CONTRASEÑA SEGURA DEL SUPERADMIN + LOG DE PASSENGER
+--------------------------------------------------------------------------------
+  Se hace ANTES de mergear la rama: si se mergea primero, el bloqueo del
+  PASO 1 deja al dueño afuera de su propio superadmin.
+
+  [ ] En tu equipo, desde la carpeta del proyecto:
+          node scripts/generar-hash-superadmin.js
+      Escribe la nueva contraseña (no se ve en pantalla) y copia el hash.
+      La contraseña NO se escribe en ningún chat ni archivo.
+  [ ] cPanel → Node.js → editar enelmapa.co:
+        - "Archivo de log Passenger":
+              /home/moralesbilma/logs/enelmapa-passenger.log
+        - Añadir variable:  SUPER_PASS_HASH  =  (el hash)
+        - NO borrar SUPER_PASS todavía.
+        - GUARDAR y después REINICIAR.
+  [ ] VERIFICACIÓN BÁSICA
+  [ ] https://enelmapa.co/superadmin/login con la NUEVA contraseña → entra
+
+  SI "Unable to set environment variables" AL GUARDAR:
+      No reiniciar. Restaurar .htaccess.antes-paso5 y avisar.
+  SI EL LOGIN FALLA CON LA CONTRASEÑA CORRECTA:
+      Probable hash recortado al guardar. Revisar el log de Passenger: el
+      arranque avisa "SUPER_PASS_HASH no tiene formato bcrypt válido".
+      Volver atrás: borrar SUPER_PASS_HASH, guardar, reiniciar (vuelve a
+      funcionar la contraseña anterior).
+  SI TODO FUNCIONA:
+  [ ] Borrar la variable SUPER_PASS, guardar, reiniciar.
+  [ ] VERIFICACIÓN BÁSICA + login del superadmin otra vez.
+
+--------------------------------------------------------------------------------
+ 5.2  MERGE DE LA RAMA (con el OK del dueño)
+--------------------------------------------------------------------------------
+  [ ] Merge a main y push (el hook corre la suite).
+  [ ] Esperar el deploy y revisar /home/moralesbilma/deploy.log → "OK"
+  [ ] VERIFICACIÓN BÁSICA
+  [ ] https://enelmapa.co/salud → {"estado":"ok"}
+  [ ] El login del superadmin sigue funcionando (el hash ya está puesto,
+      así que el bloqueo NO se activa).
+
+--------------------------------------------------------------------------------
+ 5.3  RESPALDO AUTOMÁTICO
+--------------------------------------------------------------------------------
+  [ ] Antes: en cPanel revisar el uso de disco de la cuenta y la cuota
+      disponible. La primera copia de imágenes ocupa lo mismo que uploads/.
+  [ ] Crear /home/moralesbilma/.my.cnf — en el HOME, NUNCA en public_html:
+          [mysqldump]
+          user=(el valor de DB_USER)
+          password=(el valor de DB_PASS)
+      Permisos: 0600.
+  [ ] Trabajos de cron → AÑADIR UNA LÍNEA NUEVA. No editar la del deploy.
+      Para probar, a una hora cercana (por ejemplo, dentro de 5 minutos):
+          /bin/bash /home/moralesbilma/public_html/enelmapa.co/deploy/respaldo.sh
+  [ ] Revisar /home/moralesbilma/respaldos-enelmapa/respaldo.log:
+          "OK base" y "OK imagenes"
+  [ ] VERIFICACIÓN BÁSICA
+  [ ] Dejar el cron definitivo a las 3:00:   minuto 0, hora 3, resto *
+  [ ] Prueba de restauración: crear una base DE PRUEBA en cPanel, importar
+      el .sql.gz con phpMyAdmin y confirmar que están los negocios.
+      NUNCA importar sobre moralesbilma_enelmapa.
+
+  Volver atrás: eliminar la línea del cron. El script no modifica nada fuera
+  de /home/moralesbilma/respaldos-enelmapa.
+
+--------------------------------------------------------------------------------
+ 5.4  MONITOR EXTERNO
+--------------------------------------------------------------------------------
+  [ ] Crear cuenta gratuita en UptimeRobot (uptimerobot.com).
+  [ ] Monitor tipo HTTP(s):  https://enelmapa.co/salud
+      Intervalo: 5 minutos. Alerta a: enelmapacol@gmail.com
+  [ ] Confirmar que marca "Up".
+
+--------------------------------------------------------------------------------
+ 5.5  ROTACIÓN DE SECRETOS (en horario de poco uso)
+--------------------------------------------------------------------------------
+  SESSION_SECRET
+  [ ] Generar uno nuevo en tu equipo:
+          node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  [ ] Reemplazar la variable en cPanel, guardar, reiniciar.
+  [ ] VERIFICACIÓN BÁSICA
+  Efecto esperado: todos los admins de negocio deben volver a iniciar sesión.
+
+  DB_PASS — EL MÁS DELICADO DE TODA LA TANDA
+  Es exactamente la falla del incidente [I-1]: si la contraseña de MySQL y
+  la variable DB_PASS no coinciden, Node no conecta y se caen todos los
+  menús ("Access denied"). Se recomienda hacerlo acompañado, en vivo, con
+  todas las ventanas abiertas antes de empezar:
+  [ ] 1. cPanel → Bases de datos MySQL → cambiar la contraseña del usuario
+  [ ] 2. INMEDIATAMENTE: Node.js → DB_PASS con el mismo valor → guardar →
+         reiniciar
+  [ ] 3. VERIFICACIÓN BÁSICA
+  [ ] 4. Actualizar la contraseña en /home/moralesbilma/.my.cnf
+  Volver atrás: poner en MySQL la contraseña anterior.
+
+ESTADO: pendiente — requiere acciones del dueño en cPanel.
+
+
+================================================================================
+ REGISTRO DE EJECUCIÓN DEL PASO 5 — 2026-09-14
+================================================================================
+
+5.0  Respaldo del .htaccess
+     La primera copia quedó en 0 bytes (se creó un archivo vacío con el
+     nombre en lugar de copiar el original). Detectado en la captura del File
+     Manager y rehecho copiando el contenido: 337 bytes, igual al original.
+     LECCIÓN: después de un respaldo, comparar el tamaño con el original.
+
+5.1  Contraseña del superadmin — intento con SUPER_PASS_HASH
+     - Hash generado con scripts/generar-hash-superadmin.js y cargado en cPanel.
+     - Guardar + reiniciar: menús OK.
+     - El login con la contraseña nueva falló varias veces y se agotó el límite
+       de intentos (5 fallidos cada 15 minutos por IP).
+     - Vuelta atrás: se borró SUPER_PASS_HASH. Menús OK.
+     - Diagnóstico local con scripts/verificar-hash-superadmin.js: hash y
+       contraseña COINCIDEN.
+     - Primera conclusión (INCORRECTA): cPanel altera los `$` del hash.
+       No quedó demostrado. Ver abajo.
+
+5.1  Contraseña del superadmin — plan B con SUPER_PASS
+     - Contraseña de 24 caracteres generada con base64url (sin `$` ni símbolos)
+       cargada en SUPER_PASS. Menús OK.
+     - El login volvió a fallar. En la captura el campo de contraseña tenía
+       9 puntos: el largo de la contraseña por defecto, no de la nueva.
+       Chrome autocompletaba la contraseña vieja guardada para el sitio.
+     - Eso invalida la conclusión anterior: el hash pudo estar bien y fallar
+       por el mismo autocompletado. Queda SIN CONFIRMAR si cPanel altera `$`.
+     - La contraseña quedó visible en una captura de las variables: hay que
+       regenerarla cuando el acceso esté confirmado.
+     - Verificación con curl (sin navegador ni autocompletado), un único
+       intento pasada la ventana del límite, a las 17:45:
+           login              HTTP 302 → /superadmin   ENTRÓ
+           panel /superadmin  HTTP 200                 sesión válida
+           cierre de sesión   HTTP 302                 sesión cerrada
+       CONFIRMADO: la contraseña del servidor funciona. La causa de todos los
+       fallos fue el autocompletado de Chrome con la contraseña vieja.
+       Confirmado también: la cookie de sesión funciona detrás del proxy.
+     - Pendiente: regenerar la contraseña (quedó visible en una captura) y
+       entrar desde una ventana de incógnito para evitar el autocompletado.
+     LECCIONES:
+       - Ante un login que falla tras cambiar una contraseña, descartar primero
+         el autocompletado: contar los caracteres del campo.
+       - Cada intento fallido gasta cupo del límite. Diagnosticar fuera del
+         formulario (script local o curl) antes de seguir probando.
+       - No afirmar una causa por eliminación sin haber descartado las demás.
+
+CORRECCIONES QUE SALIERON DE ESTE PASO (en la rama)
+  views/404.ejs + middleware/errorHandler.js
+      La plantilla mostraba "404" fijo para TODOS los errores. El bloqueo por
+      demasiados intentos (429) se veía como "404", y en producción se
+      interpretó como una página inexistente. Ahora muestra el código real.
+      Validación: esta plantilla atiende todos los errores del sitio; si falla
+      al renderizar, cualquier error se vuelve una respuesta rota. Se usan
+      `typeof` para que, sin datos, se comporte exactamente como antes.
+      Tests: rate-limit (el 429 muestra 429) y errorHandler (datos de la vista).
+  Voseo en mensajes visibles (6):
+      routes/admin.js, routes/superadmin.js, errors/index.js (2),
+      config/index.js, views/partials/admin-head.ejs
+      ("Esperá", "No tenés permiso", "Generá", "Volvé a iniciar sesión").
+      La revisión anterior sólo había buscado en views/ y con una lista de
+      palabras incompleta.
+  routes/superadmin.js
+      El mensaje del bloqueo ahora menciona también SUPER_PASS, que es la vía
+      que se está usando en este hosting.
+
+  Suite completa: 485 tests en verde.
+
+
+================================================================================
+ FUERA DE ESTA TANDA (anotado para después)
+================================================================================
+  - Borrar enelmapa.co-old, uploads-malas y enelmapa-backup-2026-08-17: SÓLO
+    después de que el PASO 5.3 tenga un respaldo verificado, y tras revisar
+    uploads-malas por fotos subidas durante la caída.
+  - Imágenes pesadas (redimensionar al subir y caché en /uploads).
+  - Vista previa al compartir el menú (og:image).
+  - Formulario de contacto, estadísticas por negocio, suspensión de negocios.

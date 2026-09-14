@@ -22,6 +22,33 @@ describe('loadConfig', () => {
     expect(loadConfig({ PORT: 'abc' }).port).toBe(3000);
   });
 
+  describe('superadmin con la contraseña por defecto', () => {
+    const PROD = { NODE_ENV: 'production', SESSION_SECRET: 'un-secreto-real' };
+
+    test('en producción queda bloqueado, pero la configuración NO lanza', () => {
+      // Lanzar impediría arrancar y tiraría los menús de todos los clientes.
+      let config;
+      expect(() => { config = loadConfig(PROD); }).not.toThrow();
+      expect(config.superadmin.bloqueado).toBe(true);
+    });
+
+    test('también bloquea si SUPER_PASS está escrita explícitamente con el valor por defecto', () => {
+      expect(loadConfig({ ...PROD, SUPER_PASS: 'super2026' }).superadmin.bloqueado).toBe(true);
+    });
+
+    test('con SUPER_PASS_HASH se habilita', () => {
+      expect(loadConfig({ ...PROD, SUPER_PASS_HASH: '$2a$10$abc' }).superadmin.bloqueado).toBe(false);
+    });
+
+    test('con una SUPER_PASS distinta de la por defecto se habilita', () => {
+      expect(loadConfig({ ...PROD, SUPER_PASS: 'otra-clave-larga' }).superadmin.bloqueado).toBe(false);
+    });
+
+    test('en desarrollo no se bloquea: los defaults son para trabajar en local', () => {
+      expect(loadConfig({}).superadmin.bloqueado).toBe(false);
+    });
+  });
+
   test('en producción falla si falta SESSION_SECRET', () => {
     expect(() => loadConfig({ NODE_ENV: 'production' })).toThrow(/SESSION_SECRET/);
   });

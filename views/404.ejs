@@ -1,9 +1,17 @@
+<%
+  // Muestra cualquier error, no sólo el 404. Los `typeof` son a propósito: esta
+  // plantilla la usa el manejador central para TODOS los errores, y si fallara
+  // al renderizar por una variable ausente, cualquier error del sitio terminaría
+  // en una respuesta rota. Sin datos, se comporta como antes: un 404.
+  const codigo = typeof statusCode !== 'undefined' ? statusCode : 404;
+  const encabezado = typeof titulo !== 'undefined' ? titulo : 'No encontrado';
+-%>
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>No encontrado - EnElMapa</title>
+<title><%= encabezado %> - EnElMapa</title>
 <style>
   body { font-family: 'Segoe UI', system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #FAFAF7; color: #1A1A18; margin: 0; }
   .box { text-align: center; padding: 40px; }
@@ -14,7 +22,7 @@
 </head>
 <body>
 <div class="box">
-  <h1>404</h1>
+  <h1><%= codigo %></h1>
   <p><%= message %></p>
   <p style="margin-top:20px"><a href="/">← Volver al inicio</a></p>
 </div>

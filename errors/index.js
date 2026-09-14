@@ -30,7 +30,7 @@ class UnauthorizedError extends AppError {
 }
 
 class ForbiddenError extends AppError {
-  constructor(message = 'No tenés permiso para esto') {
+  constructor(message = 'No tienes permiso para esto') {
     super(message, 403);
   }
 }
@@ -42,7 +42,7 @@ class NotFoundError extends AppError {
 }
 
 class TooManyRequestsError extends AppError {
-  constructor(message = 'Demasiados intentos. Esperá unos minutos.') {
+  constructor(message = 'Demasiados intentos. Espera unos minutos.') {
     super(message, 429);
   }
 }

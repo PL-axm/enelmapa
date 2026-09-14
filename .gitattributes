@@ -4,3 +4,7 @@
 # finales de línea.
 *.sh  text eol=lf
 *.sql text eol=lf
+
+# Los hooks no llevan extensión, así que la regla de *.sh no los alcanza, y en
+# este equipo se trabaja desde Windows.
+.githooks/* text eol=lf
