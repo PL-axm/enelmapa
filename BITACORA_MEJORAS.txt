@@ -1,0 +1,167 @@
+================================================================================
+ BITÁCORA DE MEJORAS — SEGURIDAD Y OPERACIÓN
+ Proyecto: enelmapa.co
+ Rama: feature/mejoras_seguridad_operacion
+ Inicio: 2026-09-14
+================================================================================
+
+Este archivo documenta, paso a paso, cada cambio de esta tanda: qué se hizo, por
+qué, qué riesgo se evaluó antes de hacerlo, cómo se verificó y cómo revertirlo.
+
+IMPORTANTE: este archivo está en un repositorio PÚBLICO. Nunca se escriben aquí
+contraseñas, hashes, secretos ni credenciales de ningún tipo.
+
+
+--------------------------------------------------------------------------------
+ REGLA DE ESTA TANDA: VALIDAR CONTRA LOS INCIDENTES ANTERIORES
+--------------------------------------------------------------------------------
+
+Antes de cada cambio se responde una pregunta: ¿puede repetir alguno de estos?
+
+  [I-1] CAÍDA POR CONFIGURACIÓN (2026-09-09)
+        El .htaccess del repo pisó el de producción; Node arrancó sin variables
+        de entorno, no pudo conectar a MySQL y murió al iniciar. Los menús de
+        todos los clientes quedaron caídos. Lección: un problema de
+        configuración NUNCA debe impedir que la plataforma arranque, salvo que
+        arrancar sea peor que no hacerlo.
+
+  [I-2] PÉRDIDA DE IMÁGENES (2026-09-09)
+        Se desplegó comprimiendo la carpeta local y se pisó uploads/ de
+        producción. Lección: nada toca uploads/ ni se despliega fuera de git.
+        Antes de borrar o sobrescribir algo en el servidor, se renombra.
+
+  [I-3] CÓDIGO QUE NO CORRE (2026-09-09)
+        tmp/restart.txt no reinicia Node en este hosting; el código en disco
+        y el que corre divergieron sin aviso. Lección: después de cualquier
+        cambio en el servidor, verificar desde afuera que el cambio está vivo.
+
+Además: todo cambio va primero a una rama, pasa `npm test` completo y se
+verifica en local antes de llegar a main. Main = producción en 5 minutos.
+
+
+--------------------------------------------------------------------------------
+ PLAN
+--------------------------------------------------------------------------------
+
+  Paso 1  Superadmin con contraseña por defecto  → bloquear su login
+  Paso 2  Respaldo automático de base de datos e imágenes
+  Paso 3  Endpoint /salud para monitoreo externo
+  Paso 4  Hook pre-push: no se sube nada a main sin pasar los tests
+  Paso 5  Pasos manuales en cPanel (los hace el dueño, con checklist)
+
+Los pasos 1 a 4 son cambios de código en la rama y NO tocan producción hasta
+el merge. El paso 5 tiene un orden obligatorio, explicado en su sección.
+
+
+================================================================================
+ PASO 1 — SUPERADMIN CON CONTRASEÑA POR DEFECTO
+================================================================================
+
+PROBLEMA
+  En las variables de entorno de producción el superadmin usa los valores
+  por defecto de config/index.js (correo y contraseña que están publicados en
+  el repositorio). Cualquiera que lea el repo puede entrar a /superadmin y
+  borrar todos los negocios. El rate limit no protege: no hay nada que adivinar.
+
+PRIMERA IDEA, DESCARTADA
+  Que loadConfig lance un error en producción con la contraseña por defecto,
+  igual que ya hace con SESSION_SECRET.
+
+VALIDACIÓN CONTRA INCIDENTES → FALLA [I-1]
+  Producción HOY tiene la contraseña por defecto. Al desplegar, Node no
+  arrancaría y se caerían los menús de todos los clientes por un problema que
+  sólo afecta al acceso del superadmin. Es exactamente la caída del 9 de
+  septiembre, provocada a propósito.
+
+  SESSION_SECRET sí justifica no arrancar: sin él se firmarían TODAS las
+  sesiones con un secreto público. La contraseña del superadmin compromete una
+  sola puerta, y esa puerta se puede cerrar sin apagar el edificio.
+
+SOLUCIÓN ELEGIDA
+  En producción, si el superadmin no tiene SUPER_PASS_HASH y su contraseña es
+  la de por defecto, el login de /superadmin queda BLOQUEADO con un mensaje que
+  explica cómo habilitarlo. Todo lo demás —menús, landing, panel de los
+  negocios— sigue funcionando igual.
+
+  Además se agrega un script local para generar el hash sin escribir la
+  contraseña en la terminal ni en el chat.
+
+ORDEN OBLIGATORIO AL LLEGAR A PRODUCCIÓN
+  Si se despliega este cambio antes de configurar el hash, el dueño queda
+  afuera de su propio superadmin. Por eso:
+    a) PRIMERO se configura SUPER_PASS_HASH en cPanel (el código actual en
+       producción YA lo soporta) y se verifica el login.
+    b) DESPUÉS se mergea y despliega el bloqueo.
+
+SEGUNDA VALIDACIÓN, DURANTE LA IMPLEMENTACIÓN
+  Las sesiones viven en MySQL y sobreviven a un deploy. Si alguien entró como
+  superadmin con la contraseña publicada ANTES del bloqueo, bloquear sólo el
+  login lo dejaría adentro. Por eso el bloqueo cubre todo /superadmin y le
+  quita la marca de superadmin a cualquier sesión que llegue.
+
+ARCHIVOS
+  config/index.js
+      Nuevo campo config.superadmin.bloqueado. Es true sólo si: producción,
+      sin SUPER_PASS_HASH, y contraseña igual a la por defecto.
+  routes/superadmin.js
+      Si está bloqueado, TODO /superadmin responde 403 con un mensaje que
+      explica cómo habilitarlo, y retira la marca isSuper de la sesión.
+  server.js
+      Al arrancar avisa en el log (advertencia, no error) si el acceso está
+      bloqueado, o si SUPER_PASS_HASH no tiene formato bcrypt válido. Lo
+      segundo cubre un riesgo propio de cPanel: el hash está lleno de `$` y,
+      si algo lo recorta al guardarlo, el síntoma sería "credenciales
+      incorrectas" con la contraseña correcta.
+  scripts/generar-hash-superadmin.js
+      Pide la contraseña por teclado sin mostrarla, dos veces, mínimo 12
+      caracteres, verifica el hash antes de entregarlo e imprime sólo el hash.
+      No acepta la contraseña como argumento: quedaría en el historial.
+  tests/unit/config.test.js                    (+5 tests)
+  tests/integration/superadmin-bloqueo.test.js (+6 tests)
+
+VERIFICACIÓN
+  - Con el bloqueo: login 403, credenciales por defecto no abren sesión.
+  - Una sesión de superadmin abierta antes del bloqueo pierde el acceso, y
+    no lo recupera aunque se quite el bloqueo.
+  - Con el bloqueo activo siguen respondiendo: la landing, el menú de un
+    negocio y el login del panel de negocios. (Esta es la validación contra
+    [I-1] convertida en test.)
+  - loadConfig NO lanza con la contraseña por defecto en producción.
+  - Suite completa: 480 tests en verde.
+
+CÓMO REVERTIR
+  Revertir el commit. Alternativa sin deploy: configurar SUPER_PASS_HASH en
+  cPanel levanta el bloqueo de inmediato tras reiniciar Node.
+
+PENDIENTE (manual, ver PASO 5)
+  Configurar SUPER_PASS_HASH en cPanel ANTES de mergear esta rama.
+
+ESTADO: código terminado y probado en la rama. No está en producción.
+
+
+================================================================================
+ PASO 2 — RESPALDO AUTOMÁTICO
+================================================================================
+
+ESTADO: pendiente
+
+
+================================================================================
+ PASO 3 — ENDPOINT /salud
+================================================================================
+
+ESTADO: pendiente
+
+
+================================================================================
+ PASO 4 — HOOK PRE-PUSH
+================================================================================
+
+ESTADO: pendiente
+
+
+================================================================================
+ PASO 5 — PASOS MANUALES EN CPANEL
+================================================================================
+
+ESTADO: pendiente

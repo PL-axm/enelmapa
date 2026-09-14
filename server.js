@@ -33,6 +33,27 @@ function warnAboutSecureCookie() {
     'Destrabe temporal: COOKIE_SECURE=false');
 }
 
+// Avisos sobre el acceso del superadmin. Son advertencias y no errores: ninguno
+// de los dos casos debe impedir que los menús de los clientes levanten.
+//
+// El formato del hash se revisa porque cPanel guarda las variables de entorno
+// por su cuenta, y un hash bcrypt está lleno de `$`. Si algo en el camino lo
+// recorta o lo interpreta, el síntoma sería "Credenciales incorrectas" con la
+// contraseña correcta — sin ninguna pista de que el problema es el hash.
+const FORMATO_BCRYPT = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+
+function warnAboutSuperadmin() {
+  const { bloqueado, passwordHash } = config.superadmin;
+  if (bloqueado) {
+    container.logger.warn('Acceso de superadmin BLOQUEADO: usa la contraseña por defecto del repositorio. ' +
+      'Configura SUPER_PASS_HASH para habilitarlo (ver scripts/generar-hash-superadmin.js).');
+  }
+  if (passwordHash && !FORMATO_BCRYPT.test(passwordHash)) {
+    container.logger.warn('SUPER_PASS_HASH no tiene formato bcrypt válido: el login del superadmin va a fallar. ' +
+      'Revisa que el valor no se haya recortado al guardarlo.', { largo: passwordHash.length });
+  }
+}
+
 // Las migraciones corren ANTES de escuchar: si el schema no está donde el
 // código espera, es mejor no aceptar tráfico. Usan su propia conexión, no el
 // pool de la app (ver db/migrate.js).
@@ -57,6 +78,7 @@ runMigrations(config.db, container.logger).then(({ aplicadas }) => {
       port: config.port, domain: config.domain, env: config.nodeEnv
     });
     warnAboutSecureCookie();
+    warnAboutSuperadmin();
   });
 }).catch(err => {
   container.logger.excepcion('No se pudo inicializar la base de datos', err);

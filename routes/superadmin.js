@@ -30,8 +30,28 @@ function validarFormulario(schema, vista) {
   });
 }
 
+const MENSAJE_BLOQUEADO =
+  'El acceso de superadmin está deshabilitado hasta configurar una contraseña segura (SUPER_PASS_HASH).';
+
 function createSuperadminRouter({ repos, services, config }) {
   const router = express.Router();
+
+  // Con la contraseña por defecto en producción se cierra TODO /superadmin, no
+  // sólo el login: las sesiones viven en MySQL y sobreviven a un deploy, así que
+  // quien hubiera entrado antes del bloqueo seguiría adentro. Se le quita la
+  // marca y ve la misma pantalla que cualquiera.
+  //
+  // El resto de la plataforma no se entera: los menús y el panel de cada negocio
+  // siguen funcionando. Ver `bloqueado` en config/index.js.
+  if (config.superadmin.bloqueado) {
+    router.use((req, res) => {
+      if (req.session && req.session.isSuper) {
+        delete req.session.isSuper;
+      }
+      res.status(403).render('superadmin/login', { error: MENSAJE_BLOQUEADO });
+    });
+    return router;
+  }
 
   // Más estricto que el de /admin: es una sola cuenta conocida, nadie legítimo
   // necesita muchos reintentos, y es la que más daño hace si cae.

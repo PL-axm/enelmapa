@@ -89,7 +89,17 @@ function loadConfig(env = process.env) {
     superadmin: {
       email: env.SUPER_EMAIL || DEFAULT_SUPER_EMAIL,
       passwordHash: env.SUPER_PASS_HASH || null,
-      password: env.SUPER_PASS || DEFAULT_SUPER_PASS
+      password: env.SUPER_PASS || DEFAULT_SUPER_PASS,
+      // En producción, sin hash y con la contraseña por defecto —que está
+      // publicada en este repositorio— el acceso de superadmin queda BLOQUEADO.
+      //
+      // A propósito NO se lanza un error como con SESSION_SECRET. Producción
+      // tuvo exactamente esta configuración: lanzar habría impedido arrancar y
+      // tirado los menús de todos los clientes por un problema que afecta a una
+      // sola puerta. Ya pasó una caída por configuración (2026-09-09); esta no
+      // se provoca a propósito. SESSION_SECRET sí justifica no arrancar, porque
+      // sin él TODAS las sesiones se firmarían con un secreto público.
+      bloqueado: isProduction && !env.SUPER_PASS_HASH && (env.SUPER_PASS || DEFAULT_SUPER_PASS) === DEFAULT_SUPER_PASS
     },
     // `silent` en los tests: la suite provoca cientos de errores a propósito y
     // el log los mezclaría con las fallas reales de jest.
