@@ -253,11 +253,170 @@ ESTADO: código terminado y probado en la rama. No está en producción.
  PASO 4 — HOOK PRE-PUSH
 ================================================================================
 
-ESTADO: pendiente
+PROBLEMA
+  main se despliega solo en menos de 5 minutos y el deploy no corre los
+  tests. Un push roto llegaba a producción sin ningún freno.
+
+SOLUCIÓN
+  .githooks/pre-push: al subir a main corre `npm test`; si falla, el push no
+  se hace y producción no cambia.
+
+VALIDACIÓN
+  [I-1..I-3] Es sólo local: no toca el servidor.
+  RIESGO PROPIO: un verde falso. Los tests corren sobre los archivos del
+  disco, no sobre el commit que se sube. El hook se niega si:
+    - hay cambios sin commitear, o
+    - lo que se sube a main no es el HEAD actual (por ejemplo, estando en
+      otra rama y ejecutando `git push origin main`).
+
+ARCHIVOS
+  .githooks/pre-push   el hook
+  .gitattributes       los hooks se guardan con finales de línea LF: no
+                       tienen extensión y la regla de *.sh no los alcanzaba
+
+PRUEBA
+  A. push de una rama de trabajo        → no corre nada, sale 0
+  B. push a main con cambios pendientes → se niega
+  C. push a main de otro commit         → se niega
+  D. borrar la rama remota              → no corre tests
+  E. push a main, árbol limpio          → corre la suite (485 verde), sale 0
+  F. push a main con la suite fallando  → se niega, "producción no cambió"
+
+ACTIVACIÓN
+  Ya activado en este equipo. En cualquier clon nuevo:
+      git config core.hooksPath .githooks
+
+EMERGENCIA
+  `git push --no-verify` salta el hook. Sólo para producción caída y un
+  arreglo que no puede esperar un minuto.
+
+ESTADO: terminado y activo en este equipo.
 
 
 ================================================================================
- PASO 5 — PASOS MANUALES EN CPANEL
+ PASO 5 — PASOS MANUALES EN CPANEL (EN ESTE ORDEN)
 ================================================================================
 
-ESTADO: pendiente
+El orden no es opcional: cada paso deja el sitio estable antes del siguiente,
+y cada uno trae cómo volver atrás. Después de CADA paso se verifica que los
+menús respondan ANTES de verificar lo que se cambió [I-1, I-3].
+
+VERIFICACIÓN BÁSICA (se repite después de cada paso)
+  [ ] https://enelmapa.co                  carga la landing
+  [ ] https://enelmapa.co/s/caficultor     carga el menú con fotos
+  [ ] https://caficultor.enelmapa.co       carga el menú
+
+--------------------------------------------------------------------------------
+ 5.0  RESPALDO DEL .htaccess ANTES DE TOCAR CPANEL
+--------------------------------------------------------------------------------
+  [ ] En File Manager, dentro de public_html/enelmapa.co, COPIAR .htaccess
+      como .htaccess.antes-paso5
+  Por qué: guardar la configuración de la app en cPanel reescribe ese
+  archivo, y es el que tumbó el sitio el 9 de septiembre.
+
+--------------------------------------------------------------------------------
+ 5.1  CONTRASEÑA SEGURA DEL SUPERADMIN + LOG DE PASSENGER
+--------------------------------------------------------------------------------
+  Se hace ANTES de mergear la rama: si se mergea primero, el bloqueo del
+  PASO 1 deja al dueño afuera de su propio superadmin.
+
+  [ ] En tu equipo, desde la carpeta del proyecto:
+          node scripts/generar-hash-superadmin.js
+      Escribe la nueva contraseña (no se ve en pantalla) y copia el hash.
+      La contraseña NO se escribe en ningún chat ni archivo.
+  [ ] cPanel → Node.js → editar enelmapa.co:
+        - "Archivo de log Passenger":
+              /home/moralesbilma/logs/enelmapa-passenger.log
+        - Añadir variable:  SUPER_PASS_HASH  =  (el hash)
+        - NO borrar SUPER_PASS todavía.
+        - GUARDAR y después REINICIAR.
+  [ ] VERIFICACIÓN BÁSICA
+  [ ] https://enelmapa.co/superadmin/login con la NUEVA contraseña → entra
+
+  SI "Unable to set environment variables" AL GUARDAR:
+      No reiniciar. Restaurar .htaccess.antes-paso5 y avisar.
+  SI EL LOGIN FALLA CON LA CONTRASEÑA CORRECTA:
+      Probable hash recortado al guardar. Revisar el log de Passenger: el
+      arranque avisa "SUPER_PASS_HASH no tiene formato bcrypt válido".
+      Volver atrás: borrar SUPER_PASS_HASH, guardar, reiniciar (vuelve a
+      funcionar la contraseña anterior).
+  SI TODO FUNCIONA:
+  [ ] Borrar la variable SUPER_PASS, guardar, reiniciar.
+  [ ] VERIFICACIÓN BÁSICA + login del superadmin otra vez.
+
+--------------------------------------------------------------------------------
+ 5.2  MERGE DE LA RAMA (con el OK del dueño)
+--------------------------------------------------------------------------------
+  [ ] Merge a main y push (el hook corre la suite).
+  [ ] Esperar el deploy y revisar /home/moralesbilma/deploy.log → "OK"
+  [ ] VERIFICACIÓN BÁSICA
+  [ ] https://enelmapa.co/salud → {"estado":"ok"}
+  [ ] El login del superadmin sigue funcionando (el hash ya está puesto,
+      así que el bloqueo NO se activa).
+
+--------------------------------------------------------------------------------
+ 5.3  RESPALDO AUTOMÁTICO
+--------------------------------------------------------------------------------
+  [ ] Antes: en cPanel revisar el uso de disco de la cuenta y la cuota
+      disponible. La primera copia de imágenes ocupa lo mismo que uploads/.
+  [ ] Crear /home/moralesbilma/.my.cnf — en el HOME, NUNCA en public_html:
+          [mysqldump]
+          user=(el valor de DB_USER)
+          password=(el valor de DB_PASS)
+      Permisos: 0600.
+  [ ] Trabajos de cron → AÑADIR UNA LÍNEA NUEVA. No editar la del deploy.
+      Para probar, a una hora cercana (por ejemplo, dentro de 5 minutos):
+          /bin/bash /home/moralesbilma/public_html/enelmapa.co/deploy/respaldo.sh
+  [ ] Revisar /home/moralesbilma/respaldos-enelmapa/respaldo.log:
+          "OK base" y "OK imagenes"
+  [ ] VERIFICACIÓN BÁSICA
+  [ ] Dejar el cron definitivo a las 3:00:   minuto 0, hora 3, resto *
+  [ ] Prueba de restauración: crear una base DE PRUEBA en cPanel, importar
+      el .sql.gz con phpMyAdmin y confirmar que están los negocios.
+      NUNCA importar sobre moralesbilma_enelmapa.
+
+  Volver atrás: eliminar la línea del cron. El script no modifica nada fuera
+  de /home/moralesbilma/respaldos-enelmapa.
+
+--------------------------------------------------------------------------------
+ 5.4  MONITOR EXTERNO
+--------------------------------------------------------------------------------
+  [ ] Crear cuenta gratuita en UptimeRobot (uptimerobot.com).
+  [ ] Monitor tipo HTTP(s):  https://enelmapa.co/salud
+      Intervalo: 5 minutos. Alerta a: enelmapacol@gmail.com
+  [ ] Confirmar que marca "Up".
+
+--------------------------------------------------------------------------------
+ 5.5  ROTACIÓN DE SECRETOS (en horario de poco uso)
+--------------------------------------------------------------------------------
+  SESSION_SECRET
+  [ ] Generar uno nuevo en tu equipo:
+          node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  [ ] Reemplazar la variable en cPanel, guardar, reiniciar.
+  [ ] VERIFICACIÓN BÁSICA
+  Efecto esperado: todos los admins de negocio deben volver a iniciar sesión.
+
+  DB_PASS — EL MÁS DELICADO DE TODA LA TANDA
+  Es exactamente la falla del incidente [I-1]: si la contraseña de MySQL y
+  la variable DB_PASS no coinciden, Node no conecta y se caen todos los
+  menús ("Access denied"). Se recomienda hacerlo acompañado, en vivo, con
+  todas las ventanas abiertas antes de empezar:
+  [ ] 1. cPanel → Bases de datos MySQL → cambiar la contraseña del usuario
+  [ ] 2. INMEDIATAMENTE: Node.js → DB_PASS con el mismo valor → guardar →
+         reiniciar
+  [ ] 3. VERIFICACIÓN BÁSICA
+  [ ] 4. Actualizar la contraseña en /home/moralesbilma/.my.cnf
+  Volver atrás: poner en MySQL la contraseña anterior.
+
+ESTADO: pendiente — requiere acciones del dueño en cPanel.
+
+
+================================================================================
+ FUERA DE ESTA TANDA (anotado para después)
+================================================================================
+  - Borrar enelmapa.co-old, uploads-malas y enelmapa-backup-2026-08-17: SÓLO
+    después de que el PASO 5.3 tenga un respaldo verificado, y tras revisar
+    uploads-malas por fotos subidas durante la caída.
+  - Imágenes pesadas (redimensionar al subir y caché en /uploads).
+  - Vista previa al compartir el menú (og:image).
+  - Formulario de contacto, estadísticas por negocio, suspensión de negocios.
