@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EnElMapa — El catálogo de tu negocio, siempre al día</title>
-<meta name="description" content="Tu carta o tu catálogo de productos en una página web propia, con código QR para el mostrador. Lo actualizás vos, en cualquier momento, sin reimprimir nada.">
+<meta name="description" content="Tu menú o tu catálogo de productos en una página web propia, con código QR para el mostrador. Lo actualizas tú, en cualquier momento, sin reimprimir nada.">
 
 <meta property="og:title" content="EnElMapa — El catálogo de tu negocio, siempre al día">
 <meta property="og:description" content="Tu carta o tu catálogo de productos en una página web propia, con código QR para el mostrador.">
@@ -28,7 +28,7 @@
 <%
   // El texto que el visitante ENVÍA al abrir WhatsApp — así funciona wa.me:
   // el mensaje va prellenado en su lado, no es algo que él reciba.
-  const saludo = 'Hola 👋 Quiero llevar el catálogo de mi negocio a EnElMapa. ¿Me cuentan cómo funciona?';
+  const saludo = 'Hola, quiero llevar el catálogo de mi negocio a EnElMapa. ¿Me cuentan cómo funciona?';
   const wa = 'https://wa.me/' + contacto.whatsapp + '?text=' + encodeURIComponent(saludo);
   // Un menú real vale más que cualquier captura. Si todavía no hay negocios
   // cargados, el botón simplemente no se dibuja.
@@ -60,11 +60,11 @@
     </h1>
     <p class="hero-bajada reveal">
       Tus productos en una página propia, con un código QR para el mostrador o la mesa.
-      Cambiás un precio y ya está cambiado. Sin reimprimir nada, sin llamar a nadie.
+      Cambias un precio y queda cambiado al instante. Sin reimprimir nada, sin llamar a nadie.
     </p>
     <div class="hero-acciones reveal">
       <a class="boton boton-primario" href="<%= wa %>" target="_blank" rel="noopener">
-        Escribinos por WhatsApp
+        Escríbenos por WhatsApp
       </a>
       <% if (ejemplo) { %>
         <a class="boton boton-fantasma" href="/s/<%= ejemplo.slug %>">
@@ -84,9 +84,9 @@
           lee un precio que ya no existe.
         </p>
         <p class="parrafo reveal">
-          Eso pasa cada vez que cambia un costo, se agota un producto o entra
-          uno nuevo. El menú impreso nace desactualizado y envejece rápido.
-          Y si tenés más de un local, multiplicá el problema por la cantidad
+          Eso ocurre cada vez que cambia un costo, se agota un producto o entra
+          uno nuevo. El catálogo impreso nace desactualizado y envejece rápido.
+          Y si tienes más de un local, multiplica el problema por la cantidad
           de sedes.
         </p>
       </div>
@@ -101,17 +101,17 @@
       <li class="tarjeta reveal">
         <span class="tarjeta-num">01</span>
         <h3>Código QR para imprimir</h3>
-        <p>Lo generás desde tu panel y lo pegás en la mesa, la vitrina o el mostrador. El cliente escanea y ve tu catálogo al instante, sin descargar nada.</p>
+        <p>Lo generas desde tu panel y lo ubicas en la mesa, la vitrina o el mostrador. El cliente escanea y ve tu catálogo al instante, sin descargar nada.</p>
       </li>
       <li class="tarjeta reveal">
         <span class="tarjeta-num">02</span>
-        <h3>Lo actualizás vos</h3>
-        <p>Precios, productos, fotos y descripciones. Entrás a tu panel, cambiás lo que sea y queda publicado en el momento. No dependés de nosotros para nada.</p>
+        <h3>Lo actualizas tú</h3>
+        <p>Precios, productos, fotos y descripciones. Entras a tu panel, cambias lo que necesites y queda publicado en el momento. No dependes de nosotros para nada.</p>
       </li>
       <li class="tarjeta reveal">
         <span class="tarjeta-num">03</span>
         <h3>Promociones con vigencia</h3>
-        <p>Un 2x1, un descuento, un martes especial. Poné desde cuándo, hasta cuándo y qué días de la semana: aparece y desaparece solo.</p>
+        <p>Un 2x1, un descuento, un martes especial. Defines desde cuándo, hasta cuándo y qué días de la semana: aparece y desaparece solo.</p>
       </li>
       <li class="tarjeta reveal">
         <span class="tarjeta-num">04</span>
@@ -126,35 +126,35 @@
       <li class="tarjeta reveal">
         <span class="tarjeta-num">06</span>
         <h3>Tu dirección propia</h3>
-        <p>Tunegocio.enelmapa.co, con el diseño y los colores que elijas. Un WhatsApp a un toque para que te escriban o te pidan.</p>
+        <p>tunegocio.enelmapa.co, con el diseño y los colores que elijas. Un botón de WhatsApp siempre a la vista para que te escriban o te hagan pedidos.</p>
       </li>
     </ul>
   </section>
 
   <section class="pasos" id="pasos">
     <p class="etiqueta reveal">Cómo empieza</p>
-    <h2 class="seccion-titulo reveal">Tres pasos, y no son tuyos los dos primeros.</h2>
+    <h2 class="seccion-titulo reveal">Tres pasos, y los dos primeros los hacemos nosotros.</h2>
 
     <ol class="pasos-lista">
       <li class="paso reveal">
         <span class="paso-num">1</span>
         <div>
-          <h3>Nos escribís</h3>
-          <p>Por WhatsApp o dejándonos tus datos. Charlamos qué vende tu negocio y cómo conviene ordenarlo.</p>
+          <h3>Nos escribes</h3>
+          <p>Por WhatsApp o dejándonos tus datos. Conversamos qué vende tu negocio y cómo conviene organizarlo.</p>
         </div>
       </li>
       <li class="paso reveal">
         <span class="paso-num">2</span>
         <div>
-          <h3>Te lo dejamos armado</h3>
-          <p>Creamos tu página, tu dirección propia y tu acceso. No tenés que configurar nada.</p>
+          <h3>Lo dejamos listo</h3>
+          <p>Creamos tu página, tu dirección propia y tu acceso. No tienes que configurar nada.</p>
         </div>
       </li>
       <li class="paso reveal">
         <span class="paso-num">3</span>
         <div>
-          <h3>Cargás y publicás</h3>
-          <p>Entrás con tu usuario, subís tus productos e imprimís tu QR. De ahí en adelante, el catálogo es tuyo.</p>
+          <h3>Cargas y publicas</h3>
+          <p>Entras con tu usuario, subes tus productos e imprimes tu QR. De ahí en adelante, el catálogo es tuyo.</p>
         </div>
       </li>
     </ol>
@@ -181,15 +181,15 @@
   <% } %>
 
   <section class="cierre" id="contacto">
-    <h2 class="cierre-titulo reveal">¿Empezamos?</h2>
+    <h2 class="cierre-titulo reveal">¿Comenzamos?</h2>
     <p class="cierre-bajada reveal">
-      Contanos qué vende tu negocio y te mostramos cómo se vería tu catálogo.
+      Cuéntanos qué vende tu negocio y te mostramos cómo se vería tu catálogo.
     </p>
     <a class="boton boton-primario boton-grande reveal" href="<%= wa %>" target="_blank" rel="noopener">
-      Escribinos por WhatsApp
+      Escríbenos por WhatsApp
     </a>
     <p class="cierre-alterna reveal">
-      O escribinos a <a href="mailto:<%= contacto.email %>"><%= contacto.email %></a>
+      O escríbenos a <a href="mailto:<%= contacto.email %>"><%= contacto.email %></a>
     </p>
   </section>
 
