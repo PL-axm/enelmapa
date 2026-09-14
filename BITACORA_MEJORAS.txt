@@ -143,7 +143,63 @@ ESTADO: código terminado y probado en la rama. No está en producción.
  PASO 2 — RESPALDO AUTOMÁTICO
 ================================================================================
 
-ESTADO: pendiente
+PROBLEMA
+  No existía ningún respaldo de la base de datos: JetBackup mostraba copias
+  de diciembre de 2025 y el proyecto no tenía ningún mysqldump. Las imágenes
+  se salvaron el 9 de septiembre sólo porque la carpeta se renombró.
+
+SOLUCIÓN
+  deploy/respaldo.sh, ejecutado por cron una vez por noche:
+    - Base de datos: mysqldump comprimido, verificado, con 14 días de rotación.
+    - Imágenes: copia acumulativa de uploads/ (agrega, nunca borra ni pisa).
+
+VALIDACIÓN CONTRA INCIDENTES
+  [I-2] Sólo LEE uploads/ de la app; nunca escribe ahí. Los respaldos van en
+        /home/<usuario>/respaldos-enelmapa: fuera de public_html (no
+        alcanzable por web) y fuera de la app (no lo toca `git reset`).
+  [I-1] No toca .htaccess, ni variables de entorno, ni reinicia Node.
+        --single-transaction no bloquea las tablas InnoDB durante el volcado.
+  RIESGO NUEVO, PROPIO DE ESTE PASO
+        Si los respaldos llenan la cuota de disco de la cuenta, MySQL y las
+        subidas de fotos empiezan a fallar: eso SÍ dañaría el sitio. Por eso
+        hay un tope (1500 MB): pasado el tope no respalda y lo registra.
+
+SALVAGUARDAS DEL SCRIPT
+  - Se niega si el destino queda dentro de public_html o de la app.
+  - Se niega si no existen las credenciales en ~/.my.cnf.
+  - Credenciales en ~/.my.cnf (permisos 600), nunca en la línea de comandos,
+    donde quedarían visibles en la lista de procesos.
+  - El volcado se escribe a un archivo .parcial y sólo se renombra cuando
+    pasó dos verificaciones: gzip íntegro y la línea final "Dump completed".
+  - Los respaldos viejos se borran SÓLO después de uno nuevo verificado.
+  - Nombre con fecha y hora hasta los segundos: un respaldo nunca pisa a otro.
+
+PRUEBA (local, con un mysqldump simulado)
+  1. mysqldump falla        → salida 1, respaldo viejo intacto, sin parciales
+  2. volcado incompleto     → salida 1, respaldo viejo intacto, nada nuevo
+  3. volcado correcto       → salida 0, archivo verificado, viejo rotado
+  4. copia de imágenes      → foto borrada en la app sigue en la copia;
+                              foto pisada en la app conserva su original;
+                              foto nueva copiada; la app no se modifica
+  5. destino dentro de app  → salida 1 y NADA escrito en la app
+  6. sin credenciales       → salida 1
+  7. tope superado          → salida 1, ningún respaldo creado
+
+  HALLAZGO DE LA PRUEBA: en la primera versión, el caso 5 se negaba a
+  respaldar, pero ya había creado la carpeta dentro de la app, porque el mkdir
+  estaba antes de la verificación. Se corrigió moviendo la verificación al
+  principio. Sin esta prueba, el bug habría llegado al servidor.
+
+PENDIENTE (manual, ver PASO 5)
+  - Crear ~/.my.cnf con las credenciales (fuera de public_html, permisos 600).
+  - Programar el cron nocturno.
+  - Correrlo una vez a mano y revisar respaldo.log.
+  - Probar una restauración en una base de prueba (no en la de producción).
+
+CÓMO REVERTIR
+  Eliminar el cron. El script no modifica nada fuera de su carpeta de destino.
+
+ESTADO: código terminado y probado en local. No está en producción.
 
 
 ================================================================================
