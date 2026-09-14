@@ -442,8 +442,16 @@ ESTADO: pendiente — requiere acciones del dueño en cPanel.
        por el mismo autocompletado. Queda SIN CONFIRMAR si cPanel altera `$`.
      - La contraseña quedó visible en una captura de las variables: hay que
        regenerarla cuando el acceso esté confirmado.
-     - Siguiente verificación: un único intento con curl (sin navegador ni
-       autocompletado), pasada la ventana del límite de intentos.
+     - Verificación con curl (sin navegador ni autocompletado), un único
+       intento pasada la ventana del límite, a las 17:45:
+           login              HTTP 302 → /superadmin   ENTRÓ
+           panel /superadmin  HTTP 200                 sesión válida
+           cierre de sesión   HTTP 302                 sesión cerrada
+       CONFIRMADO: la contraseña del servidor funciona. La causa de todos los
+       fallos fue el autocompletado de Chrome con la contraseña vieja.
+       Confirmado también: la cookie de sesión funciona detrás del proxy.
+     - Pendiente: regenerar la contraseña (quedó visible en una captura) y
+       entrar desde una ventana de incógnito para evitar el autocompletado.
      LECCIONES:
        - Ante un login que falla tras cambiar una contraseña, descartar primero
          el autocompletado: contar los caracteres del campo.
