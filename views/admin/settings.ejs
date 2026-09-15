@@ -65,24 +65,6 @@
   <button type="button" id="btnAddLocation" style="padding:10px 16px;background:#C8956C;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">+ Agregar ubicación</button>
 </div>
 
-<!-- Modal para agregar/editar ubicación -->
-<div id="locationModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:400px">
-    <h3 style="margin-top:0">Agregar ubicación</h3>
-    <div class="form-group">
-      <label>Dirección</label>
-      <input type="text" id="locationAddress" placeholder="Ej: Primavera Life Mall - Local 109" required>
-    </div>
-    <label style="display:flex;align-items:center;gap:8px">
-      <input type="checkbox" id="locationIsPrimary">
-      <span>Marcar como principal</span>
-    </label>
-    <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end">
-      <button type="button" id="btnCloseLocationModal" style="padding:10px 16px;background:#E8E5DE;border:none;border-radius:6px;cursor:pointer">Cancelar</button>
-      <button type="button" id="btnSaveLocation" style="padding:10px 16px;background:#C8956C;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">Guardar</button>
-    </div>
-  </div>
-</div>
 
 <div class="card">
   <%# El diseño (layout) es un eje aparte del color y del tamaño: cualquier
@@ -294,6 +276,25 @@
   <button type="submit" class="btn btn-primary">Guardar cambios</button>
 </div>
 </form>
+
+<!-- Modal para agregar/editar ubicación -->
+<div id="locationModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:400px">
+    <h3 style="margin-top:0">Agregar ubicación</h3>
+    <div class="form-group">
+      <label>Dirección</label>
+      <input type="text" id="locationAddress" placeholder="Ej: Primavera Life Mall - Local 109">
+    </div>
+    <label style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="locationIsPrimary">
+      <span>Marcar como principal</span>
+    </label>
+    <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end">
+      <button type="button" id="btnCloseLocationModal" style="padding:10px 16px;background:#E8E5DE;border:none;border-radius:6px;cursor:pointer">Cancelar</button>
+      <button type="button" id="btnSaveLocation" style="padding:10px 16px;background:#C8956C;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">Guardar</button>
+    </div>
+  </div>
+</div>
 
 <script>
 document.getElementById('settingsForm').addEventListener('submit', async function(e) {
