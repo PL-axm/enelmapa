@@ -258,8 +258,8 @@
   <% hours.forEach(h => { %>
     <div class="horarios-fila">
       <span class="dia" style="font-size:14px"><%= h.day_name %></span>
-      <input type="time" class="hour-open" data-day="<%= h.day_index %>" value="<%= h.open_time %>" style="padding:6px 8px;border:1px solid #E8E5DE;border-radius:6px;font-size:13px">
-      <input type="time" class="hour-close" data-day="<%= h.day_index %>" value="<%= h.close_time %>" style="padding:6px 8px;border:1px solid #E8E5DE;border-radius:6px;font-size:13px">
+      <input type="time" class="hour-open" data-day="<%= h.day_index %>" value="<%= h.open_time %>">
+      <input type="time" class="hour-close" data-day="<%= h.day_index %>" value="<%= h.close_time %>">
       <label class="toggle"><input type="checkbox" class="hour-closed" data-day="<%= h.day_index %>" <%= h.is_closed ? 'checked' : '' %>><span class="toggle-slider"></span></label>
     </div>
   <% }) %>
