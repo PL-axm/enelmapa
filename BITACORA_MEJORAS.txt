@@ -490,3 +490,22 @@ CORRECCIONES QUE SALIERON DE ESTE PASO (en la rama)
   - Imágenes pesadas (redimensionar al subir y caché en /uploads).
   - Vista previa al compartir el menú (og:image).
   - Formulario de contacto, estadísticas por negocio, suspensión de negocios.
+
+================================================================================
+ HALLAZGO 2026-09-15 — NGINX SIRVE /uploads, NO NODE
+================================================================================
+
+Al poner caché de un año a las imágenes se comprobó que la cabecera nunca
+llega: nginx sirve los archivos de /uploads directamente desde el disco y Node
+no ve esas peticiones. Se nota en las cabeceras de una imagen: sin ETag y con
+Accept-Ranges, que es la firma de nginx, no de express.static. Cuando el
+archivo NO existe, la petición sí llega a Node (responde nuestra página de
+error).
+
+Consecuencia: la configuración de caché de imágenes del código es inofensiva
+pero inútil mientras nginx las sirva. El menú de un negocio pesa unos 28 MB en
+fotos y se vuelven a descargar según el criterio que invente cada navegador.
+
+PENDIENTE: ajustar la caché de estáticos en la configuración de nginx de cPanel
+(no en el código). Y redimensionar las imágenes al subirlas, que sigue siendo
+la mejora de mayor impacto para quien entra al menú desde el celular.
