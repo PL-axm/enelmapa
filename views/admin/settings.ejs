@@ -5,7 +5,7 @@
 <form id="settingsForm" enctype="multipart/form-data">
 <div class="card">
   <h3>Información general</h3>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div class="campos-2">
     <div class="form-group">
       <label>Nombre del negocio</label>
       <input type="text" name="name" value="<%= business.name %>" required>
@@ -48,7 +48,7 @@
   <p style="font-size:13px;color:#6B6860;margin-bottom:16px">Administra las ubicaciones de tu negocio</p>
   <div id="locationsList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
     <% locations.forEach(function(loc) { %>
-      <div class="location-item" data-location-id="<%= loc.id %>" style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:#FAFAF7;border-radius:8px;border-left:4px solid <%= loc.is_primary ? '#C8956C' : '#E8E5DE' %>">
+      <div class="location-item ubicacion-item" data-location-id="<%= loc.id %>" style="border-left:4px solid <%= loc.is_primary ? '#C8956C' : '#E8E5DE' %>">
         <div>
           <div style="font-weight:600;font-size:14px"><%= loc.address %></div>
           <% if (loc.is_primary) { %>
@@ -229,7 +229,7 @@
 
 <div class="card">
   <h3>Imágenes</h3>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+  <div class="campos-2">
     <div class="form-group">
       <label>Banner</label>
       <input type="file" name="banner" accept="image/*">
@@ -249,15 +249,15 @@
 
 <div class="card">
   <h3>Horarios de atención</h3>
-  <div style="display:grid;grid-template-columns:100px 1fr 1fr auto;gap:10px;padding-bottom:8px;border-bottom:2px solid #E8E5DE">
+  <div class="horarios-cab">
     <span style="font-size:12px;font-weight:600;color:#9C9889">DÍA</span>
     <span style="font-size:12px;font-weight:600;color:#9C9889">APERTURA</span>
     <span style="font-size:12px;font-weight:600;color:#9C9889">CIERRE</span>
     <span style="font-size:12px;font-weight:600;color:#9C9889">CERRADO</span>
   </div>
   <% hours.forEach(h => { %>
-    <div style="display:grid;grid-template-columns:100px 1fr 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #E8E5DE">
-      <span style="font-size:14px"><%= h.day_name %></span>
+    <div class="horarios-fila">
+      <span class="dia" style="font-size:14px"><%= h.day_name %></span>
       <input type="time" class="hour-open" data-day="<%= h.day_index %>" value="<%= h.open_time %>" style="padding:6px 8px;border:1px solid #E8E5DE;border-radius:6px;font-size:13px">
       <input type="time" class="hour-close" data-day="<%= h.day_index %>" value="<%= h.close_time %>" style="padding:6px 8px;border:1px solid #E8E5DE;border-radius:6px;font-size:13px">
       <label class="toggle"><input type="checkbox" class="hour-closed" data-day="<%= h.day_index %>" <%= h.is_closed ? 'checked' : '' %>><span class="toggle-slider"></span></label>
@@ -270,7 +270,7 @@
     formulario y el mensaje aparecía fuera de la pantalla — se mostraba y nadie lo
     veía nunca. Se dejan los dos: quien guardó con el scroll arriba ve ese, y quien
     guardó desde el botón ve este. %>
-<div style="display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:20px">
+<div class="acciones-guardar">
   <div id="saveAlertAbajo" class="alert alert-success" style="display:none;margin-bottom:0">Cambios guardados correctamente</div>
   <a href="/s/<%= session.businessSlug %>" target="_blank" class="btn btn-secondary">Ver menú</a>
   <button type="submit" class="btn btn-primary">Guardar cambios</button>

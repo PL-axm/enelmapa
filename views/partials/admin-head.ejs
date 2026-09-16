@@ -73,6 +73,39 @@
     .main { margin-left: 0; }
     .sidebar-footer { display: none; }
   }
+
+  /* Configuración en pantallas chicas.
+     Estas rejillas estaban escritas en el atributo `style` de cada div, y un
+     estilo inline le gana a cualquier regla de @media: por eso el panel se veía
+     apretado en el celular por más reglas responsive que hubiera. Movidas acá
+     para que se puedan reacomodar. */
+  .campos-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .horarios-cab, .horarios-fila { display: grid; grid-template-columns: 100px 1fr 1fr auto; gap: 10px; align-items: center; }
+  .horarios-cab { padding-bottom: 8px; border-bottom: 2px solid #E8E5DE; }
+  .horarios-fila { padding: 8px 0; border-bottom: 1px solid #E8E5DE; }
+  .acciones-guardar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 20px; }
+  .ubicacion-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px; background: #FAFAF7; border-radius: 8px; }
+  /* El selector de archivo tiene un ancho propio grande y se salía de la tarjeta. */
+  .form-group input[type="file"] { max-width: 100%; }
+
+  @media (max-width: 768px) {
+    .campos-2 { grid-template-columns: 1fr; }
+
+    /* El horario pasa a dos líneas: el día y el interruptor arriba, las dos
+       horas abajo. En cuatro columnas, cada campo de hora quedaba de unos 60px. */
+    .horarios-cab { display: none; }
+    .horarios-fila { display: flex; flex-wrap: wrap; row-gap: 8px; padding: 14px 0; }
+    .horarios-fila .dia { order: 1; flex: 1 1 auto; font-weight: 600; }
+    .horarios-fila .toggle { order: 2; flex: 0 0 auto; }
+    .horarios-fila .hour-open { order: 3; flex: 1 1 0; min-width: 0; }
+    .horarios-fila .hour-close { order: 4; flex: 1 1 0; min-width: 0; }
+
+    /* Guardar primero y a lo ancho: es la acción principal y el pulgar llega. */
+    .acciones-guardar { flex-direction: column-reverse; align-items: stretch; }
+    .acciones-guardar .btn { width: 100%; text-align: center; }
+
+    .ubicacion-item { flex-wrap: wrap; }
+  }
 </style>
 </head>
 <body>

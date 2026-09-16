@@ -39,8 +39,35 @@ function createApp({ repos, services, config, sessionStore, logger }) {
   // navegador no lo va a interpretar como HTML o JS por adivinar el tipo.
   // Importa porque uploads/ se sirve desde el mismo origen que el panel.
   app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    // Un año de caché: los nombres de archivo son aleatorios y NUNCA se
+    // reutilizan, así que una imagen ya guardada no puede quedar vieja. Antes
+    // no se mandaba ninguna instrucción y cada navegador inventaba su plazo,
+    // volviendo a pedir fotos de cientos de KB en cada visita al menú.
+    maxAge: '365d',
+    immutable: true,
     setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff')
   }));
+
+  // Caché del HTML. Hasta acá no se mandaba ninguna cabecera, así que cada
+  // navegador y cada proxy decidía por su cuenta cuánto guardar una página, y
+  // un dueño que cambiaba un precio podía no verlo reflejado.
+  //
+  //   no-store  en el panel y la API: son datos privados de un negocio; no
+  //             deben quedar en disco ni reaparecer con el botón 'atrás'.
+  //   no-cache  en el menú y la landing: el navegador SÍ puede guardarlos,
+  //             pero tiene que preguntar si cambiaron. Con el ETag que ya
+  //             emite Express la respuesta habitual es un 304 sin cuerpo:
+  //             cuesta casi nada y los cambios se ven al instante.
+  //
+  // Va después de los archivos estáticos, que responden antes y conservan su
+  // propia caché.
+  app.use((req, res, next) => {
+    const privado = req.path.startsWith('/admin') ||
+                    req.path.startsWith('/superadmin') ||
+                    req.path.startsWith('/api');
+    res.set('Cache-Control', privado ? 'no-store' : 'no-cache');
+    next();
+  });
 
   // El store entra acá, no en config.session: config no conoce el pool.
   app.use(session({ ...config.session, store: sessionStore }));

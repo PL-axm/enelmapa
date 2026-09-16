@@ -1,9 +1,15 @@
-const { createTestApp } = require('../helpers/container');
+const { createTestApp, getTestPool } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createBusiness } = require('../helpers/fixtures');
 const { loginAdmin } = require('../helpers/sesion');
 
 const app = createTestApp();
+
+// A nivel de archivo: dentro de un describe se ejecutaría al terminar ESE bloque
+// y dejaría sin base a los siguientes.
+afterAll(async () => {
+  await closeDb();
+});
 
 // El botón "Guardar cambios" de Configuración dejó de funcionar sin dar ningún
 // error: no pasaba nada al presionarlo.
@@ -32,9 +38,6 @@ describe('formulario de Configuración', () => {
     agent = await loginAdmin(app, { email: business.adminEmail, password: business.adminPassword });
   });
 
-  afterAll(async () => {
-    await closeDb();
-  });
 
   async function html() {
     const res = await agent.get('/admin/settings');
@@ -68,5 +71,47 @@ describe('formulario de Configuración', () => {
       expect({ bloque: i, tieneRequired: alcance.includes('required') })
         .toEqual({ bloque: i, tieneRequired: false });
     });
+  });
+});
+
+// El panel se veía apretado en el celular porque las rejillas estaban escritas
+// en el atributo `style` de cada div, y un estilo inline le gana a cualquier
+// regla de @media. Estos tests fijan que el maquetado viva en clases.
+describe('Configuración en pantallas chicas', () => {
+  let agent;
+
+  beforeEach(async () => {
+    await resetDb();
+    const business = await createBusiness({
+      slug: 'test-settings-movil',
+      name: 'Test Settings Movil',
+      adminEmail: 'admin-settings-movil@test.local',
+      adminPassword: 'password-movil-123'
+    });
+    agent = await loginAdmin(app, { email: business.adminEmail, password: business.adminPassword });
+
+    // La fixture no crea horarios y las filas se dibujan por cada día: sin
+    // esto, el maquetado que se quiere verificar no llega a renderizarse.
+    const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    for (let i = 0; i < dias.length; i++) {
+      await getTestPool().query(
+        'INSERT INTO business_hours (business_id, day_index, day_name, open_time, close_time, is_closed) VALUES (?, ?, ?, ?, ?, 0)',
+        [business.businessId, i, dias[i], '08:00', '20:00']
+      );
+    }
+  });
+
+  test('el maquetado usa clases, no rejillas fijas escritas en el HTML', async () => {
+    const res = await agent.get('/admin/settings');
+    expect(res.status).toBe(200);
+
+    expect(res.text).toContain('class="campos-2"');
+    expect(res.text).toContain('class="horarios-fila"');
+    expect(res.text).toContain('class="acciones-guardar"');
+
+    // Ninguna rejilla de ancho fijo dentro de un atributo style: son las que no
+    // se pueden reacomodar en un celular.
+    const inline = res.text.match(/style="[^"]*grid-template-columns:[^"]*"/g) || [];
+    expect(inline).toEqual([]);
   });
 });
