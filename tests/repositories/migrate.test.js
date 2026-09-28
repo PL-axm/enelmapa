@@ -147,4 +147,43 @@ describe('runner de migraciones', () => {
       await limpiarControl(['905_multi.sql']);
     });
   });
+
+  // El 2026-09-28 el servidor de desarrollo murió al arrancar con "Duplicate
+  // column name": arrancó, `--watch` lo reinició enseguida, los dos procesos
+  // leyeron la misma migración como pendiente antes de que ninguno la
+  // registrara, y el segundo intentó crear una columna que ya existía.
+  //
+  // En producción es peor: Passenger levanta varios procesos y todos corren
+  // las migraciones al arrancar, así que un deploy podía dejar un worker
+  // caído — el síntoma más caro que tuvo este proyecto.
+  describe('dos arranques simultáneos', () => {
+    test('no se pisan: la migración se aplica una sola vez', async () => {
+      const tabla = 'carrera_' + Date.now();
+      const archivo = '900_carrera.sql';
+      const dir = dirTemporal({
+        [archivo]: 'CREATE TABLE ' + tabla + ' (id INT PRIMARY KEY);' +
+                   'ALTER TABLE ' + tabla + ' ADD COLUMN nombre VARCHAR(20);'
+      });
+
+      try {
+        // Sin candado, uno de los dos revienta con "Duplicate column name".
+        const resultados = await Promise.all([
+          runMigrations(config(), silencioso, { dir }),
+          runMigrations(config(), silencioso, { dir })
+        ]);
+
+        // Exactamente uno la aplicó; el otro la encontró ya aplicada.
+        const aplicaron = resultados.filter(r => r.aplicadas.includes(archivo));
+        expect(aplicaron).toHaveLength(1);
+
+        const [filas] = await getTestPool().query(
+          'SELECT COUNT(*) AS n FROM schema_migrations WHERE name = ?', [archivo]
+        );
+        expect(filas[0].n).toBe(1);
+      } finally {
+        await getTestPool().query('DROP TABLE IF EXISTS ' + tabla);
+        await limpiarControl([archivo]);
+      }
+    });
+  });
 });

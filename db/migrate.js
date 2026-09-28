@@ -18,6 +18,10 @@ const mysql = require('mysql2/promise');
 
 const DIR = path.join(__dirname, 'migrations');
 
+// Segundos que se espera el candado antes de rendirse. Generoso: una migración
+// lenta de otro proceso es motivo para esperar, no para arrancar sin schema.
+const ESPERA_CANDADO_S = 30;
+
 async function crearTablaDeControl(conn) {
   await conn.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -53,9 +57,36 @@ async function runMigrations(dbConfig, logger = console, { dir = DIR } = {}) {
     multipleStatements: true
   });
 
+  // Un candado con nombre, del lado de MySQL, para que DOS ARRANQUES
+  // SIMULTÁNEOS no apliquen la misma migración a la vez.
+  //
+  // No es hipotético: pasó el 2026-09-28 en desarrollo. El servidor arrancó,
+  // `--watch` lo reinició enseguida, los dos procesos leyeron "009 pendiente"
+  // antes de que ninguno la registrara, y el segundo murió con "Duplicate
+  // column name". En producción es peor: Passenger levanta varios procesos y
+  // todos corren esto al arrancar, así que un deploy puede dejar un worker
+  // caído — el síntoma más caro que tuvo este proyecto.
+  //
+  // La guarda de information_schema que usan las migraciones no alcanza: si
+  // ambos consultan antes de que el primero altere, ambos ven "no existe".
+  //
+  // El nombre lleva la base porque los candados de MySQL son de todo el
+  // servidor: sin eso, la base de test bloquearía a la de desarrollo.
+  const candado = 'enelmapa_migraciones_' + dbConfig.database;
+
   try {
+    const [[tomado]] = await conn.query('SELECT GET_LOCK(?, ?) AS ok', [candado, ESPERA_CANDADO_S]);
+    if (tomado.ok !== 1) {
+      throw new Error(
+        'No se pudo tomar el candado de migraciones (' + candado + ') en ' +
+        ESPERA_CANDADO_S + 's. Otro proceso las está aplicando.'
+      );
+    }
+
     await crearTablaDeControl(conn);
 
+    // Se lee DESPUÉS de tener el candado, a propósito: mientras esperábamos,
+    // el otro proceso pudo aplicar todo. Leer antes sería volver a la carrera.
     const [filas] = await conn.query('SELECT name FROM schema_migrations');
     const yaAplicadas = new Set(filas.map(f => f.name));
 
@@ -89,6 +120,10 @@ async function runMigrations(dbConfig, logger = console, { dir = DIR } = {}) {
 
     return { aplicadas, yaEstaban: yaAplicadas.size };
   } finally {
+    // Cerrar la conexión ya libera el candado, pero soltarlo explícitamente
+    // deja claro el alcance y no depende de ese detalle. Si falla, no importa:
+    // la conexión se cierra igual en la línea siguiente.
+    try { await conn.query('SELECT RELEASE_LOCK(?)', [candado]); } catch (e) { /* la conexión ya se cayó */ }
     await conn.end();
   }
 }
