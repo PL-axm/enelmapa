@@ -11,7 +11,7 @@ function createPublicRouter({ services, config }) {
   const router = express.Router();
 
   router.get('*', (req, res) => {
-    const { business, businessHours, categories, products, locations } = req;
+    const { business, businessHours, categories, products, locations, galerias } = req;
 
     // La fecha se calcula acá y se inyecta: el servicio es puro y no lee el
     // reloj. `config.zonaHoraria` es la del negocio, no la del servidor — si el
@@ -22,7 +22,8 @@ function createPublicRouter({ services, config }) {
       categories,
       products,
       promosEnabled: Boolean(business.promos_enabled),
-      hoy
+      hoy,
+      galerias
     });
 
     res.render('menu', {

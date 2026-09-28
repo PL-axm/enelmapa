@@ -51,7 +51,43 @@ describe('menuService.buildMenu', () => {
     });
 
     expect(Object.keys(categorias[0].products[0]).sort())
-      .toEqual(['desc', 'id', 'img', 'name', 'price', 'promo']);
+      .toEqual(['desc', 'id', 'img', 'imgs', 'name', 'price', 'promo']);
+  });
+
+  // La galería llega aparte (una sola consulta para todos los productos) y el
+  // servicio la pega a cada uno. Las tarjetas siguen usando img; imgs se usa
+  // al abrir el producto, que es cuando el cliente está decidiendo.
+  describe("galería de fotos", () => {
+    test("cada producto recibe sus fotos, la principal primero", () => {
+      const { categorias } = menu.buildMenu({
+        categories: [cat(1, "X")],
+        products: [prod(10, 1)],
+        galerias: { 10: ["/uploads/1/a.jpg", "/uploads/1/b.jpg"] }
+      });
+
+      expect(categorias[0].products[0].imgs).toEqual(["/uploads/1/a.jpg", "/uploads/1/b.jpg"]);
+    });
+
+    test("sin galería cae a la foto de siempre", () => {
+      // Un producto creado antes de que existiera la tabla de fotos no puede
+      // quedarse sin imagen en el menú.
+      const { categorias } = menu.buildMenu({
+        categories: [cat(1, "X")],
+        products: [prod(10, 1)]
+      });
+
+      const visto = categorias[0].products[0];
+      expect(visto.imgs).toEqual(visto.img ? [visto.img] : []);
+    });
+
+    test("sin foto de ningún tipo, la galería va vacía", () => {
+      const { categorias } = menu.buildMenu({
+        categories: [cat(1, "X")],
+        products: [{ ...prod(10, 1), image: null }]
+      });
+
+      expect(categorias[0].products[0].imgs).toEqual([]);
+    });
   });
 
   // Un producto sin imagen tiene que salir con cadena vacía y no con null: la

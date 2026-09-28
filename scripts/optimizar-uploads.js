@@ -23,6 +23,10 @@ const os = require('os');
 const crypto = require('crypto');
 const imagenOptimizada = require('../services/imagenOptimizada');
 
+// Un solo hilo: en un servidor compartido, sharp usando todos los núcleos hace
+// que el proveedor limite la cuenta y el sitio se ponga lento para los clientes.
+try { require('sharp').concurrency(1); } catch (e) { /* sin sharp no hay nada que limitar */ }
+
 const args = process.argv.slice(2);
 const opcion = (nombre, porDefecto) => {
   const i = args.indexOf(nombre);
@@ -30,6 +34,16 @@ const opcion = (nombre, porDefecto) => {
 };
 
 const APLICAR = args.includes('--aplicar');
+// Pausa entre fotos, en milisegundos. El servidor es compartido y con límites
+// de CPU por cuenta: procesar decenas de imágenes de 24 megapíxeles a toda
+// velocidad puede hacer que el hosting frene la cuenta entera y el menú se
+// ponga lento justo mientras corre la conversión. Con la pausa tarda más y no
+// se nota desde afuera.
+const PAUSA_MS = Number(opcion('--pausa', 250));
+// Cuántas convertir como máximo en esta corrida. Permite hacerlo por tandas y
+// ver el efecto antes de seguir.
+const LIMITE = Number(opcion('--limite', Infinity));
+const esperar = (ms) => new Promise(r => setTimeout(r, ms));
 const DIR = path.resolve(opcion('--dir', path.join(__dirname, '..', 'uploads')));
 const RESPALDO = path.resolve(opcion('--respaldo', path.join(DIR, '..', 'uploads-originales')));
 const MINIMO_KB = Number(opcion('--minimo-kb', 200));
@@ -68,10 +82,12 @@ async function main() {
     process.exit(1);
   }
 
-  const imagenes = listarImagenes(DIR).filter(r => fs.statSync(r).size > MINIMO_KB * 1024);
+  const todas = listarImagenes(DIR).filter(r => fs.statSync(r).size > MINIMO_KB * 1024);
+  const imagenes = Number.isFinite(LIMITE) ? todas.slice(0, LIMITE) : todas;
 
   console.log((APLICAR ? 'APLICANDO' : 'SIMULACRO (nada se modifica)') + ' sobre ' + DIR);
-  console.log('candidatas: ' + imagenes.length + ' fotos de más de ' + MINIMO_KB + ' KB');
+  console.log('candidatas: ' + imagenes.length + ' de ' + todas.length + ' fotos de más de ' + MINIMO_KB + ' KB');
+  if (APLICAR && PAUSA_MS) console.log('pausa entre fotos: ' + PAUSA_MS + ' ms (para no saturar el servidor)');
   if (APLICAR) console.log('respaldo de originales en: ' + RESPALDO);
   console.log('');
 
@@ -110,6 +126,7 @@ async function main() {
       cambiadas++;
       despuesTotal += r.despues;
       console.log('  ' + path.relative(DIR, ruta) + ': ' + Math.round(antes / 1024) + ' KB -> ' + Math.round(r.despues / 1024) + ' KB');
+      if (PAUSA_MS) await esperar(PAUSA_MS);
     } else {
       despuesTotal += antes;
       if (r.motivo && !r.motivo.startsWith('ya estaba')) {

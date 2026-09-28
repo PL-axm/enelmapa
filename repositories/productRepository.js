@@ -84,6 +84,17 @@ function productRepository(db, categoryRepo) {
           return rows;
         },
 
+        // Un producto por id, ya scopeado. Devuelve null si no es de este
+        // negocio, que es lo que permite responder 404 en vez de 403: un 403
+        // confirmaría que el id existe y volvería el endpoint un enumerador.
+        async get(id) {
+          const [rows] = await db.query(
+            'SELECT * FROM products WHERE id = ? AND business_id = ?',
+            [id, businessId]
+          );
+          return rows[0] || null;
+        },
+
         async count() {
           const [rows] = await db.query(
             'SELECT COUNT(*) as count FROM products WHERE business_id = ?',
@@ -138,6 +149,18 @@ function productRepository(db, categoryRepo) {
           const [result] = await db.query(
             'UPDATE products SET ' + sets + ' WHERE id = ? AND business_id = ?',
             values
+          );
+          return result.affectedRows > 0;
+        },
+
+        // Cambia SÓLO la foto principal. El update general exige el producto
+        // entero, y usarlo para esto obligaría a releer y reenviar nombre,
+        // precio, categoría y promoción: cualquier campo que llegara mal por el
+        // camino se sobrescribiría sin que nadie lo pidiera.
+        async setImagenPrincipal(id, image) {
+          const [result] = await db.query(
+            'UPDATE products SET image = ? WHERE id = ? AND business_id = ?',
+            [image, id, businessId]
           );
           return result.affectedRows > 0;
         },

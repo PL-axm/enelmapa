@@ -163,6 +163,14 @@ function createApiRouter({ repos, services, logger }) {
       promo: camposPromo(req.body)
     });
 
+    // La foto del formulario entra también a la galería, como primera. Sin
+    // esto, un producto creado por el camino de siempre tendría foto en la
+    // tarjeta del menú y la galería vacía.
+    const subida = uploadedPath(req);
+    if (subida) {
+      await services.productImages.asegurarPrincipal(req.session.businessId, id, subida);
+    }
+
     res.json({ ok: true, id });
   }));
 
@@ -185,6 +193,15 @@ function createApiRouter({ repos, services, logger }) {
     });
 
     requireAffected(afectó, 'Producto no encontrado');
+
+    // Una foto nueva desde el formulario pasa a encabezar la galería: es la
+    // que va a mostrar la tarjeta del menú, y las dos tienen que empezar por
+    // la misma.
+    const nueva = uploadedPath(req);
+    if (nueva) {
+      await services.productImages.asegurarPrincipal(req.session.businessId, req.params.id, nueva);
+    }
+
     res.json({ ok: true });
   }));
 
@@ -230,6 +247,52 @@ function createApiRouter({ repos, services, logger }) {
     await services.locations.eliminar(req.session.businessId, req.params.id);
     res.json({ ok: true });
   }));
+
+  // === FOTOS DE PRODUCTO ===
+  //
+  // La galería es una tabla aparte, pero products.image sigue siendo la foto
+  // principal: es la que leen las tarjetas del menú y los dos skins. El
+  // servicio mantiene las dos cosas en sincronía dentro de una transacción.
+
+  router.get('/products/:id/images', authRequired, requireIntParam('id'), asyncHandler(async (req, res) => {
+    const fotos = await repos.productImages.forBusiness(req.session.businessId).list(req.params.id);
+    res.json({ fotos, maximo: services.productImages.MAXIMO });
+  }));
+
+  // La imagen ya pasó por verificarImagenes (que es la que de verdad dice si
+  // es una imagen) y por optimizarImagenes, así que acá llega liviana.
+  router.post('/products/:id/images', authRequired, requireIntParam('id'),
+    upload.single('image'), verificarImagenes, optimizarImagenes,
+    asyncHandler(async (req, res) => {
+      if (!req.file) throw new ValidationError('No llegó ninguna imagen');
+
+      const ruta = '/uploads/' + req.session.businessId + '/' + req.file.filename;
+      const { id, total } = await services.productImages.agregar(
+        req.session.businessId, req.params.id, ruta
+      );
+      res.json({ ok: true, id, image: ruta, total });
+    })
+  );
+
+  router.delete('/products/:id/images/:imageId', authRequired,
+    requireIntParam('id'), requireIntParam('imageId'),
+    asyncHandler(async (req, res) => {
+      const { quedan } = await services.productImages.eliminar(
+        req.session.businessId, req.params.id, req.params.imageId
+      );
+      res.json({ ok: true, quedan });
+    })
+  );
+
+  router.put('/products/:id/images/:imageId/principal', authRequired,
+    requireIntParam('id'), requireIntParam('imageId'),
+    asyncHandler(async (req, res) => {
+      await services.productImages.hacerPrincipal(
+        req.session.businessId, req.params.id, req.params.imageId
+      );
+      res.json({ ok: true });
+    })
+  );
 
   // === QR CODE ===
   router.get('/qr', authRequired, asyncHandler(async (req, res) => {
