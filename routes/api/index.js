@@ -1,5 +1,6 @@
 const express = require('express');
-const { createUploader, verificarImagenes, traducirErroresDeSubida } = require('../../services/imageUpload');
+const { createUploader, verificarImagenes, traducirErroresDeSubida, archivosDe } = require('../../services/imageUpload');
+const imagenOptimizada = require('../../services/imagenOptimizada');
 const authRequired = require('../../middleware/auth');
 const asyncHandler = require('../../middleware/asyncHandler');
 const validate = require('../../middleware/validate');
@@ -53,7 +54,11 @@ function camposPromo(body) {
 // Sin `pool`: no queda una sola query inline acá. Los handlers son cableado
 // puro — leer la request, llamar al repo, responder. El scope de tenant entra
 // una vez por handler, en `forBusiness(req.session.businessId)`.
-function createApiRouter({ repos, services }) {
+function createApiRouter({ repos, services, logger }) {
+  // Reduce las fotos recién subidas. Va SIEMPRE después de verificarImagenes:
+  // si el archivo no era una imagen de verdad, ya fue rechazado y borrado.
+  // Nunca corta la request — ver services/imagenOptimizada.js.
+  const optimizarImagenes = imagenOptimizada.crearMiddleware({ logger, archivosDe });
   const router = express.Router();
 
   const upload = createUploader();
@@ -63,7 +68,7 @@ function createApiRouter({ repos, services }) {
     { name: 'banner', maxCount: 1 },
     { name: 'logo', maxCount: 1 },
     { name: 'flyer', maxCount: 1 }
-  ]), verificarImagenes, validate(schemas.settings), asyncHandler(async (req, res) => {
+  ]), verificarImagenes, optimizarImagenes, validate(schemas.settings), asyncHandler(async (req, res) => {
     const {
       name, address, phone, whatsapp, instagram, facebook, tiktok,
       is_open, menu_theme, menu_template, menu_scale, promos_enabled, quitar_flyer, hours
@@ -144,7 +149,7 @@ function createApiRouter({ repos, services }) {
     ? '/uploads/' + req.session.businessId + '/' + req.file.filename
     : '';
 
-  router.post('/products', authRequired, upload.single('image'), verificarImagenes, validate(schemas.productCreate), asyncHandler(async (req, res) => {
+  router.post('/products', authRequired, upload.single('image'), verificarImagenes, optimizarImagenes, validate(schemas.productCreate), asyncHandler(async (req, res) => {
     const { name, description, price, category_id } = req.body;
 
     // `price` ya es número y `category_id` entero: los convirtió el esquema.
@@ -166,7 +171,7 @@ function createApiRouter({ repos, services }) {
     res.json({ ok: true });
   }));
 
-  router.put('/products/:id', authRequired, requireIntParam('id'), upload.single('image'), verificarImagenes, validate(schemas.productUpdate), asyncHandler(async (req, res) => {
+  router.put('/products/:id', authRequired, requireIntParam('id'), upload.single('image'), verificarImagenes, optimizarImagenes, validate(schemas.productUpdate), asyncHandler(async (req, res) => {
     const { name, description, price, category_id, is_active } = req.body;
 
     const afectó = await repos.products.forBusiness(req.session.businessId).update(req.params.id, {
