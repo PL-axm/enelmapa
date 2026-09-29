@@ -101,7 +101,7 @@ function createApp({ repos, services, config, sessionStore, logger }) {
 
   app.use('/admin', createAdminRouter({ repos, services, config }));
   app.use('/superadmin', createSuperadminRouter({ repos, services, config }));
-  app.use('/api', createApiRouter({ repos, services }));
+  app.use('/api', createApiRouter({ repos, services, logger }));
 
   app.get('/s/:slug', tenantMiddleware, publicRoutes);
 

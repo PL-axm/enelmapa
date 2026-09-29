@@ -151,6 +151,18 @@
   .wa-fab:hover { transform: scale(1.08); }
   .wa-fab svg { width: 26px; height: 26px; }
 
+  <%# Galería del producto. Se desliza con el dedo (scroll horizontal con
+      anclaje) en vez de con flechas: en un celular, arrastrar es el gesto
+      natural y no hay que acertarle a un botón chico. Las flechas se suman en
+      pantallas grandes, donde no hay dedo que arrastre. %>
+  .pm-galeria { position: relative; }
+  .pm-tira { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .pm-tira::-webkit-scrollbar { display: none; }
+  .pm-tira img { flex: 0 0 100%; scroll-snap-align: center; width: 100%; object-fit: cover; }
+  .pm-puntos { display: flex; justify-content: center; gap: 6px; padding: 10px 0 0; }
+  .pm-punto { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background 0.2s, transform 0.2s; }
+  .pm-punto.activo { background: var(--accent); transform: scale(1.25); }
+
   <%# Los breakpoints están partidos igual que el resto: acá los del chrome, en
       el skin los de las tarjetas. Cada mitad conserva su orden base → media, que
       es lo que decide la cascada. %>
@@ -237,7 +249,14 @@
   <button class="product-modal-back" onclick="document.getElementById('productModal').classList.remove('open')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
   </button>
-  <img class="product-modal-img" id="pmImg" src="" alt="">
+  <%# La imagen única se queda: es la que se usa cuando el producto tiene una
+      sola foto, que es el caso de la enorme mayoría. La tira aparece sólo
+      cuando hay más de una. %>
+  <div class="pm-galeria">
+    <img class="product-modal-img" id="pmImg" src="" alt="">
+    <div class="pm-tira" id="pmTira" style="display:none"></div>
+    <div class="pm-puntos" id="pmPuntos" style="display:none"></div>
+  </div>
   <div class="product-modal-body">
     <div class="product-modal-name" id="pmName"></div>
     <div class="product-modal-desc" id="pmDesc"></div>
@@ -419,6 +438,7 @@ function openProductModal(p) {
 
   document.getElementById('pmFooter').textContent =
     'Precio: ' + formatPrice(p.promo && p.promo.price !== null ? p.promo.price : p.price);
+  pintarGaleria(p);
   document.getElementById('productModal').classList.add('open');
 }
 
@@ -513,6 +533,56 @@ const observer = new IntersectionObserver((entries) => {
   });
 }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
 sections.forEach(s => observer.observe(s));
+
+// Dibuja la galería del producto abierto.
+//
+// Con una sola foto se muestra la imagen de siempre y no se arma nada: el
+// caso normal no paga el costo del caso raro.
+function pintarGaleria(p) {
+  const unica = document.getElementById("pmImg");
+  const tira = document.getElementById("pmTira");
+  const puntos = document.getElementById("pmPuntos");
+  const fotos = (p.imgs && p.imgs.length ? p.imgs : (p.img ? [p.img] : []));
+
+  tira.textContent = "";
+  puntos.textContent = "";
+
+  if (fotos.length <= 1) {
+    unica.style.display = fotos.length ? "" : "none";
+    tira.style.display = "none";
+    puntos.style.display = "none";
+    return;
+  }
+
+  unica.style.display = "none";
+  tira.style.display = "flex";
+  puntos.style.display = "flex";
+
+  fotos.forEach(function (ruta, i) {
+    const img = document.createElement("img");
+    img.src = ruta;
+    img.alt = p.name;
+    // Sólo la primera se carga de entrada: las demás, cuando el cliente
+    // desliza. Con hasta 5 fotos por producto, cargarlas todas sería
+    // descargar cuatro imágenes que quizá nadie mire.
+    if (i > 0) img.loading = "lazy";
+    tira.appendChild(img);
+
+    const punto = document.createElement("span");
+    punto.className = "pm-punto" + (i === 0 ? " activo" : "");
+    puntos.appendChild(punto);
+  });
+
+  // El punto activo se calcula del scroll real, no de un contador propio:
+  // así queda bien aunque el cliente arrastre a medias o vuelva atrás.
+  tira.onscroll = function () {
+    const indice = Math.round(tira.scrollLeft / tira.clientWidth);
+    Array.prototype.forEach.call(puntos.children, function (punto, i) {
+      punto.classList.toggle("activo", i === indice);
+    });
+  };
+  tira.scrollLeft = 0;
+}
 </script>
 </body>
 </html>

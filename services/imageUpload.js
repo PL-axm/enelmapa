@@ -143,6 +143,7 @@ function traducirErroresDeSubida(err, req, res, next) {
 module.exports = {
   createUploader,
   verificarImagenes,
+  archivosDe,
   traducirErroresDeSubida,
   limpiarArchivosSubidos,
   detectarFormato,

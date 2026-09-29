@@ -29,7 +29,7 @@ function menuService() {
   // negocio que quiere terminar la promo del mes vería el precio tachado en cada
   // tarjeta hasta editar producto por producto. Un interruptor que deja la mitad
   // encendida no sirve para lo que se usa.
-  function paraLaVista(p, hoy, promosEnabled) {
+  function paraLaVista(p, hoy, promosEnabled, galerias) {
     const enPromo = promosEnabled && hoy && promos.estaActiva(p, hoy);
 
     return {
@@ -38,6 +38,14 @@ function menuService() {
       desc: p.description,
       price: p.price,
       img: p.image || '',
+      // La galería completa, con la principal primero. Las tarjetas siguen
+      // usando `img`: mostrar varias fotos en una grilla de productos sería
+      // ruido, y además obligaría a tocar los dos skins. La galería se ve al
+      // abrir el producto, que es cuando el cliente está decidiendo.
+      //
+      // Si el producto no tiene filas en la galería (creado antes de esta
+      // tabla y sin migrar), cae a su foto de siempre.
+      imgs: (galerias && galerias[p.id]) || (p.image ? [p.image] : []),
       // `null` y no un objeto vacío: el skin pregunta `if (p.promo)`, y un
       // objeto siempre presente obligaría a mirar adentro para saber si hay
       // promoción.
@@ -63,14 +71,17 @@ function menuService() {
     // efecto secundario: un negocio que crea "Postres" y todavía no le cargó
     // nada no debería mostrarle al cliente una sección vacía. La sección de
     // promociones sigue la misma regla, por eso `null` cuando no hay ninguna.
-    buildMenu({ categories, products, promosEnabled = false, hoy = null }) {
+    // `galerias` es un objeto { idDeProducto: [rutas] }. Opcional a propósito:
+    // sin él el menú se arma igual, con una foto por producto, que es como
+    // funcionaba antes.
+    buildMenu({ categories, products, promosEnabled = false, hoy = null, galerias = {} }) {
       const categorias = categories
         .map(cat => ({
           id: cat.id,
           name: cat.name,
           products: products
             .filter(p => p.category_id === cat.id)
-            .map(p => paraLaVista(p, hoy, promosEnabled))
+            .map(p => paraLaVista(p, hoy, promosEnabled, galerias))
         }))
         .filter(cat => cat.products.length > 0);
 

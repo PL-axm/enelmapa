@@ -33,11 +33,23 @@ function createTenantMiddleware({ repos }) {
     const products = await repos.products.forBusiness(business.id).listActive();
     const locations = await repos.locations.forBusiness(business.id).getAll();
 
+    // Las fotos de TODOS los productos en una sola consulta. Pedirlas producto
+    // por producto serían decenas de consultas por visita al menú.
+    const fotos = await repos.productImages
+      .forBusiness(business.id)
+      .listForProducts(products.map(p => p.id));
+
+    const galerias = {};
+    for (const foto of fotos) {
+      (galerias[foto.product_id] = galerias[foto.product_id] || []).push(foto.image);
+    }
+
     req.business = business;
     req.businessHours = hours;
     req.categories = categories;
     req.products = products;
     req.locations = locations;
+    req.galerias = galerias;
 
     next();
   });

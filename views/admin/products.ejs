@@ -90,6 +90,18 @@
         <input type="file" id="prodImage" accept="image/*">
         <img id="prodImgPreview" class="img-preview" style="display:none">
       </div>
+
+      <%# La galería sólo aparece al EDITAR: subir una foto necesita que el
+          producto ya exista, porque cuelga de su id. Al crear, la foto del
+          campo de arriba queda como primera de la galería. %>
+      <div class="form-group" id="prodGaleriaGroup" style="display:none">
+        <label>Más fotos <span id="prodGaleriaCuenta" style="font-weight:400;color:#9C9889"></span></label>
+        <p style="font-size:12px;color:#6B6860;margin:0 0 10px">
+          La primera es la que se ve en el menú. Puedes cambiarla con "Hacer principal".
+        </p>
+        <div id="prodGaleria" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+        <input type="file" id="prodFotoNueva" accept="image/*" style="margin-top:10px">
+      </div>
       <div class="form-group" id="prodActiveGroup" style="display:none">
         <label style="display:flex;align-items:center;gap:10px">
           Activo
@@ -341,6 +353,8 @@ function openAddProd() {
   document.getElementById('prodCat').selectedIndex = 0;
   document.getElementById('prodImgPreview').style.display = 'none';
   document.getElementById('prodActiveGroup').style.display = 'none';
+  // La galería necesita un producto existente al que colgar las fotos.
+  document.getElementById('prodGaleriaGroup').style.display = 'none';
   cargarPromo({});
   document.getElementById('prodModal').classList.add('open');
 }
@@ -361,6 +375,7 @@ function editProd(p) {
     document.getElementById('prodImgPreview').style.display = 'none';
   }
   cargarPromo(p);
+  cargarGaleria(p.id);
   document.getElementById('prodModal').classList.add('open');
 }
 
@@ -401,6 +416,101 @@ document.getElementById('prodImage').addEventListener('change', function() {
     preview.src = URL.createObjectURL(file);
     preview.style.display = '';
   }
+});
+
+// ===================== GALERÍA DE FOTOS =====================
+//
+// La foto principal del producto (products.image) es SIEMPRE la primera de
+// la galería: es la que muestran las tarjetas del menú. El servidor mantiene
+// las dos en sincronía; acá sólo se dibuja lo que devuelve.
+
+let galeriaProductoId = null;
+
+async function cargarGaleria(productoId) {
+  galeriaProductoId = productoId;
+  const grupo = document.getElementById("prodGaleriaGroup");
+  const contenedor = document.getElementById("prodGaleria");
+  grupo.style.display = "";
+  contenedor.textContent = "Cargando…";
+
+  const res = await fetch("/api/products/" + productoId + "/images");
+  if (!res.ok) { contenedor.textContent = "No se pudieron cargar las fotos."; return; }
+  const { fotos, maximo } = await res.json();
+
+  document.getElementById("prodGaleriaCuenta").textContent = "(" + fotos.length + " de " + maximo + ")";
+  document.getElementById("prodFotoNueva").disabled = fotos.length >= maximo;
+
+  contenedor.textContent = "";
+  if (fotos.length === 0) {
+    const vacio = document.createElement("p");
+    vacio.style.cssText = "font-size:13px;color:#9C9889;margin:0";
+    vacio.textContent = "Todavía no hay fotos.";
+    contenedor.appendChild(vacio);
+    return;
+  }
+
+  fotos.forEach(function (foto, i) {
+    const caja = document.createElement("div");
+    caja.style.cssText = "width:110px;border:1px solid #E8E5DE;border-radius:8px;overflow:hidden;background:#FAFAF7";
+
+    const img = document.createElement("img");
+    img.src = foto.image;
+    img.alt = "";
+    img.loading = "lazy";
+    img.style.cssText = "width:100%;height:80px;object-fit:cover;display:block";
+    caja.appendChild(img);
+
+    const pie = document.createElement("div");
+    pie.style.cssText = "padding:6px;display:flex;flex-direction:column;gap:4px";
+
+    if (i === 0) {
+      const badge = document.createElement("span");
+      badge.textContent = "Principal";
+      badge.style.cssText = "font-size:11px;background:#C8956C;color:#fff;border-radius:4px;padding:2px 6px;text-align:center";
+      pie.appendChild(badge);
+    } else {
+      const principal = document.createElement("button");
+      principal.type = "button";
+      principal.textContent = "Hacer principal";
+      principal.style.cssText = "font-size:11px;border:1px solid #E8E5DE;background:#fff;border-radius:4px;padding:3px;cursor:pointer;font-family:inherit";
+      principal.addEventListener("click", async function () {
+        if (await apiFetch("/api/products/" + productoId + "/images/" + foto.id + "/principal", { method: "PUT" })) {
+          cargarGaleria(productoId);
+        }
+      });
+      pie.appendChild(principal);
+    }
+
+    const quitar = document.createElement("button");
+    quitar.type = "button";
+    quitar.textContent = "Quitar";
+    quitar.style.cssText = "font-size:11px;border:none;background:#FFE0E0;color:#C84040;border-radius:4px;padding:3px;cursor:pointer;font-family:inherit";
+    quitar.addEventListener("click", async function () {
+      if (!confirm("¿Quitar esta foto?")) return;
+      if (await apiFetch("/api/products/" + productoId + "/images/" + foto.id, { method: "DELETE" })) {
+        cargarGaleria(productoId);
+      }
+    });
+    pie.appendChild(quitar);
+
+    caja.appendChild(pie);
+    contenedor.appendChild(caja);
+  });
+}
+
+// Se sube apenas se elige el archivo: un botón aparte sólo agrega un paso
+// para olvidarse.
+document.getElementById("prodFotoNueva").addEventListener("change", async function () {
+  if (!this.files || !this.files[0] || !galeriaProductoId) return;
+  const fd = new FormData();
+  fd.append("image", this.files[0]);
+
+  const entrada = this;
+  entrada.disabled = true;
+  const ok = await apiFetch("/api/products/" + galeriaProductoId + "/images", { method: "POST", body: fd });
+  entrada.value = "";
+  entrada.disabled = false;
+  if (ok) cargarGaleria(galeriaProductoId);
 });
 </script>
 
