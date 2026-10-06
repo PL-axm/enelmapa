@@ -49,6 +49,11 @@ const DEFAULT_RATE_WINDOW_MIN = 15;
 const DEFAULT_LOGIN_MAX = 10;
 const DEFAULT_SUPER_LOGIN_MAX = 5;
 
+// Eventos de estadísticas del menú por IP y por minuto. Generoso a propósito:
+// los clientes de un restaurante suelen estar todos en el wifi del local, o
+// sea detrás de UNA sola IP, y cada uno manda varios eventos por visita.
+const DEFAULT_EVENTOS_MAX = 300;
+
 // Devuelve un entero >= 0, o el default si no vino nada. Un 0 explícito
 // desactiva el limitador — lo usan los tests, que hacen decenas de logins
 // desde la misma IP.
@@ -110,7 +115,8 @@ function loadConfig(env = process.env) {
     rateLimit: {
       windowMs: intOrDefault(env.RATE_LIMIT_WINDOW_MIN, DEFAULT_RATE_WINDOW_MIN) * 60 * 1000,
       loginMax: intOrDefault(env.RATE_LIMIT_LOGIN_MAX, DEFAULT_LOGIN_MAX),
-      superadminMax: intOrDefault(env.RATE_LIMIT_SUPER_MAX, DEFAULT_SUPER_LOGIN_MAX)
+      superadminMax: intOrDefault(env.RATE_LIMIT_SUPER_MAX, DEFAULT_SUPER_LOGIN_MAX),
+      eventosMax: intOrDefault(env.RATE_LIMIT_EVENTOS_MAX, DEFAULT_EVENTOS_MAX)
     },
     contacto: {
       // Sólo dígitos, con código de país: es el formato que espera wa.me.

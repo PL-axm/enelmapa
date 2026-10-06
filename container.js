@@ -7,6 +7,7 @@ const userRepository = require('./repositories/userRepository');
 const locationRepository = require('./repositories/locationRepository');
 const saludRepository = require('./repositories/saludRepository');
 const productImageRepository = require('./repositories/productImageRepository');
+const eventRepository = require('./repositories/eventRepository');
 const authService = require('./services/authService');
 const businessService = require('./services/businessService');
 const locationService = require('./services/locationService');
@@ -42,8 +43,9 @@ function buildRepos(db) {
   const locations = locationRepository(db);
   const salud = saludRepository(db);
   const productImages = productImageRepository(db);
+  const events = eventRepository(db);
 
-  return { categories, products, businesses, users, locations, salud, productImages };
+  return { categories, products, businesses, users, locations, salud, productImages, events };
 }
 
 function createContainer(config) {

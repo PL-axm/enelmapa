@@ -1,5 +1,6 @@
 const { z } = require('zod');
 const tema = require('../theme');
+const { TIPOS: TIPOS_DE_EVENTO } = require('../services/estadisticas');
 
 // Hasta acá no había ninguna validación de entrada (hallazgo E5): lo que
 // mandaba el cliente llegaba tal cual al SQL. Los síntomas eran tres:
@@ -319,7 +320,22 @@ const schemas = {
   // Crear y editar validan lo mismo, así que comparten el esquema: son dos
   // nombres para que las rutas se lean solas, no dos reglas distintas.
   newLocation: ubicación,
-  editLocation: ubicación
+  editLocation: ubicación,
+
+  // === estadísticas del menú (el beacon público) ===
+  // Viene de cualquier visitante, sin sesión, así que todo se acota: el tipo a
+  // una lista cerrada y los textos a un largo máximo. `o` y `ref` son crudos
+  // —el parámetro de la URL y el host del referrer—; qué significan lo decide
+  // services/estadisticas.js.
+  evento: z.object({
+    tipo: z.enum(TIPOS_DE_EVENTO, { message: 'Tipo de evento inválido' }),
+    product_id: idPositivo('El producto').optional(),
+    o: z.string().max(20).optional().default(''),
+    ref: z.string().max(255).optional().default('')
+  }).refine(
+    (e) => e.tipo !== 'producto' || e.product_id !== undefined,
+    { message: 'Falta el producto', path: ['product_id'] }
+  )
 };
 
 module.exports = { schemas, SLUGS_RESERVADOS };

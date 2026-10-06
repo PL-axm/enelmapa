@@ -10,6 +10,7 @@ const createPublicRouter = require('./routes/public');
 const createAdminRouter = require('./routes/admin');
 const createSuperadminRouter = require('./routes/superadmin');
 const createApiRouter = require('./routes/api/index');
+const createEventosRouter = require('./routes/eventos');
 const { getSubdomain } = require('./services/subdomain');
 
 // Más de esto y la base se considera caída. Un monitor externo suele esperar
@@ -80,7 +81,13 @@ function createApp({ repos, services, config, sessionStore, logger }) {
   // Los dos logins están exentos: son las únicas mutaciones sin sesión previa,
   // así que no puede haber token todavía. Ver el comentario de middleware/csrf.
   app.use(csrf.provide);
-  app.use(csrf.createProtect({ exentas: ['/admin/login', '/superadmin/login'] }));
+  //
+  // El beacon de estadísticas también: lo manda cualquier visitante anónimo del
+  // menú, que no tiene sesión y no debe tenerla (sería una fila en `sessions`
+  // por visitante). Sólo suma un contador; no lee ni cambia datos de nadie. Sin
+  // la exención, un dueño logueado que mira su propio menú en /s/slug recibiría
+  // 403 en cada evento.
+  app.use(csrf.createProtect({ exentas: ['/admin/login', '/superadmin/login', /^\/s\/[^/]+\/evento$/] }));
 
   const tenantMiddleware = createTenantMiddleware({ repos });
   const publicRoutes = createPublicRouter({ services, config });
@@ -103,6 +110,7 @@ function createApp({ repos, services, config, sessionStore, logger }) {
   app.use('/superadmin', createSuperadminRouter({ repos, services, config }));
   app.use('/api', createApiRouter({ repos, services, logger }));
 
+  app.use(createEventosRouter({ repos, config }));
   app.get('/s/:slug', tenantMiddleware, publicRoutes);
 
   // Chequeo de salud para el monitor externo. La caída del 2026-09-09 la

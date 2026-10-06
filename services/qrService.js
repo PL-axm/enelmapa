@@ -26,10 +26,16 @@ function qrService({ config }) {
     // necesitan ambos —el panel muestra la URL debajo del código, y el JSON la
     // devuelve para el botón de descarga— y así no hay forma de que uno arme
     // una y el otro otra.
+    //
+    // El PNG codifica `urlQr`, que es la misma URL más `?o=qr`: así las
+    // estadísticas distinguen quién entró escaneando (services/estadisticas.js).
+    // `url` queda limpia porque es la que el dueño lee y copia para compartir
+    // en redes — si llevara el parámetro, esas visitas contarían como QR.
     async forSlug(slug, { size = TAMAÑO_POR_DEFECTO } = {}) {
       const url = this.menuUrl(slug);
-      const dataUrl = await QRCode.toDataURL(url, { ...OPCIONES, width: size });
-      return { url, dataUrl };
+      const urlQr = url + '?o=qr';
+      const dataUrl = await QRCode.toDataURL(urlQr, { ...OPCIONES, width: size });
+      return { url, urlQr, dataUrl };
     }
   };
 }
