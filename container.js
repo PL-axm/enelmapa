@@ -7,12 +7,14 @@ const userRepository = require('./repositories/userRepository');
 const locationRepository = require('./repositories/locationRepository');
 const saludRepository = require('./repositories/saludRepository');
 const productImageRepository = require('./repositories/productImageRepository');
+const eventRepository = require('./repositories/eventRepository');
 const authService = require('./services/authService');
 const businessService = require('./services/businessService');
 const locationService = require('./services/locationService');
 const productImageService = require('./services/productImageService');
 const qrService = require('./services/qrService');
 const menuService = require('./services/menuService');
+const tableroService = require('./services/tableroService');
 const { createLogger } = require('./services/logger');
 
 // Composition root: el ÚNICO lugar del código que construye dependencias.
@@ -42,8 +44,9 @@ function buildRepos(db) {
   const locations = locationRepository(db);
   const salud = saludRepository(db);
   const productImages = productImageRepository(db);
+  const events = eventRepository(db);
 
-  return { categories, products, businesses, users, locations, salud, productImages };
+  return { categories, products, businesses, users, locations, salud, productImages, events };
 }
 
 function createContainer(config) {
@@ -84,7 +87,8 @@ function createContainer(config) {
     menu: menuService(),
     businesses: businessService({ repos, withTransaction, auth }),
     locations: locationService({ withTransaction }),
-    productImages: productImageService({ withTransaction, logger })
+    productImages: productImageService({ withTransaction, logger }),
+    tablero: tableroService({ repos })
   };
 
   return {

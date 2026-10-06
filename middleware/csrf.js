@@ -67,10 +67,13 @@ function provide(req, res, next) {
 // login. El riesgo que queda es login-CSRF (que alguien te loguee en una cuenta
 // ajena), bastante menor que el de las mutaciones autenticadas, y a cambio los
 // dos logins ya tienen rate limiting.
+//
+// Una exenta puede ser un texto (ruta exacta) o una RegExp, para las rutas que
+// llevan un parámetro: el beacon de estadísticas es `/s/<slug>/evento`.
 function createProtect({ exentas = [] } = {}) {
   return function protect(req, res, next) {
     if (!METODOS_QUE_MUTAN.includes(req.method)) return next();
-    if (exentas.includes(req.path)) return next();
+    if (exentas.some(e => (e instanceof RegExp ? e.test(req.path) : e === req.path))) return next();
 
     // Sin sesión autenticada no hay token que comparar, y tampoco hay nada que
     // proteger: todas las rutas que mutan exigen `authRequired` o

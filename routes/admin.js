@@ -6,6 +6,7 @@ const { regenerarSesion, destruirSesion } = require('../middleware/sesion');
 const jsonInline = require('../services/jsonInline');
 const tema = require('../theme');
 const promos = require('../services/promos');
+const estadisticas = require('../services/estadisticas');
 
 // Cada handler es leer la sesión, llamar a un repo o servicio, y renderizar.
 // Ni SQL ni bcrypt ni generación de QR: eso vive en repositories/ y services/.
@@ -57,8 +58,25 @@ function createAdminRouter({ repos, services, config }) {
     const business = await repos.businesses.forBusiness(scope).get();
     const categories = await repos.categories.forBusiness(scope).count();
     const products = await repos.products.forBusiness(scope).count();
+    const visitas7 = await services.tablero.visitasRecientes(scope, {
+      hoy: estadisticas.momentoEn(config.zonaHoraria).dia
+    });
 
-    res.render('admin/dashboard', { session: req.session, business, stats: { categories, products } });
+    res.render('admin/dashboard', { session: req.session, business, stats: { categories, products, visitas7 } });
+  }));
+
+  // El tablero de estadísticas del propio negocio. Scopeado por la sesión: el
+  // dueño no puede pedir el de otro, no hay id en la URL que cambiar.
+  //
+  // "Hoy" se calcula acá, en la zona del negocio, y se inyecta — el servicio
+  // no lee el reloj. Ver `momentoEn`.
+  router.get('/estadisticas', authRequired, asyncHandler(async (req, res) => {
+    const tablero = await services.tablero.deNegocio(req.session.businessId, {
+      dias: req.query.dias,
+      hoy: estadisticas.momentoEn(config.zonaHoraria).dia
+    });
+
+    res.render('admin/estadisticas', { session: req.session, tablero });
   }));
 
   router.get('/settings', authRequired, asyncHandler(async (req, res) => {

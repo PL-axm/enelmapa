@@ -21,7 +21,7 @@ There is no lint or build step. `npm test` is the gate before any merge — see 
 
 ### Environment variables
 
-`PORT`, `DOMAIN` (default `enelmapa.co`), `SESSION_SECRET`, `DB_HOST`, `DB_USER`, `DB_PASS`, `DB_NAME`, `SUPER_EMAIL`, `SUPER_PASS` / `SUPER_PASS_HASH` (superadmin login; the plaintext defaults `admin@enelmapa.co` / `super2026` are insecure on purpose and only acceptable in local dev), `LOG_LEVEL`, `LOG_SILENT`, `RATE_LIMIT_WINDOW_MIN`, `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_SUPER_MAX` (a rate limit of `0` disables the limiter — that's how the tests do dozens of logins from one IP).
+`PORT`, `DOMAIN` (default `enelmapa.co`), `SESSION_SECRET`, `DB_HOST`, `DB_USER`, `DB_PASS`, `DB_NAME`, `SUPER_EMAIL`, `SUPER_PASS` / `SUPER_PASS_HASH` (superadmin login; the plaintext defaults `admin@enelmapa.co` / `super2026` are insecure on purpose and only acceptable in local dev), `LOG_LEVEL`, `LOG_SILENT`, `RATE_LIMIT_WINDOW_MIN`, `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_SUPER_MAX`, `RATE_LIMIT_EVENTOS_MAX` (per IP per minute for the menu-stats beacon, default 300) (a rate limit of `0` disables the limiter — that's how the tests do dozens of logins from one IP).
 
 **`SESSION_SECRET` is mandatory under `NODE_ENV=production`**: `loadConfig` throws instead of booting, because a deployment that forgot it would otherwise sign every session with the default secret that lives in this public repo.
 
@@ -152,6 +152,26 @@ Two smaller traps worth keeping in mind:
 
 The public menu falls back to `business.address` when a tenant has no rows yet, so the feature degrades instead of breaking for businesses that never opened the panel.
 
+### Menu statistics (visits, product views, clicks)
+
+`menu_events` holds one row per event — `visita`, `producto`, `whatsapp`, `instagram`, `facebook` — never summarised. Plan and phases: `plans/estadisticas-visitas.md`.
+
+**Events come from the browser, not from rendering.** The shell (`views/menu.ejs`, so every skin is covered) sends `navigator.sendBeacon` to `POST /s/<slug>/evento` (`routes/eventos.js`): one `visita` on load, `producto` from `openProductModal`, and a click on anything with `data-evento="…"`. Counting at render time would count the scanners hitting the site at 100+ req/min and every WhatsApp/Instagram link preview; none of them run JS. Body is form-urlencoded on purpose — `sendBeacon` with a non-CORS-safelisted type like JSON fails in some browsers.
+
+The endpoint hangs off `/s/:slug` rather than `/api` because `/api` requires an admin session, and a relative `/s/<slug>/evento` works the same on the subdomain and on the path. It skips `tenantMiddleware` (which loads the whole menu) and **always answers 204** — including for bots and unknown slugs — so it can't be used to enumerate which businesses exist. It is CSRF-exempt (`app.js`, a RegExp in `exentas`): visitors have no session, and an owner logged in viewing their own menu on `/s/slug` would otherwise get 403 on every event.
+
+Decisions live in `services/estadisticas.js` (pure):
+
+- **`dia`/`hora` are stored already in `config.zonaHoraria`**, same reasoning as promotions; grouping `created_at` in UTC would move every visit after 7pm to the next day, and `CONVERT_TZ` needs timezone tables that cPanel doesn't guarantee.
+- **`visitante` = sha256(ip + UA + day + session secret)**, 16 hex chars. No cookie and no IP stored; because the day is in the hash, today's visitor can't be linked to yesterday's. That makes "unique visitors" a *per-day* count — label it that way, don't sum it into "people this month".
+- **Origin**: `?o=qr` (the QR encodes `urlQr`, while `qrService.forSlug` keeps returning a clean `url` for the owner to read and share), then the referrer host, then the Instagram/Facebook in-app browser UA. The menu strips `?o=qr` from the address bar after load so a shared link doesn't count as a scan. **QRs printed before this change carry no marker** and show up as `directo`.
+
+`menu_events.product_id` has **no FK on purpose**: deleted products keep their history. Reads must JOIN `products` scoped by business, which also makes a foreign `product_id` sent by hand invisible.
+
+**The dashboards.** `/admin/estadisticas` (the owner, scoped by session — no id in the URL), `/superadmin/estadisticas` (one row per business, `repos.events.platform.resumenPorNegocio`, a `LEFT JOIN` so businesses with zero visits still show) and `/superadmin/estadisticas/:id`. The owner's page and the superadmin's per-business page render **the same partial**, `views/partials/estadisticas.ejs`, from the same `services.tablero.deNegocio` — so they can't drift. The partial takes its colours from CSS variables (`--est-*-x`) that the host page sets: the owner panel is light, the superadmin dark.
+
+The view computes nothing: `estadisticas.armarTablero` (pure) hands it bar heights, percentages and the zero-filled days; `services/tableroService.js` runs the queries. Charts are server-side SVG, no library — there's no bundler and no CDN in this project. Ranges are 7/30/90 days (`rangoValido`; anything else falls back to 30), "today" is computed in the router with `momentoEn(config.zonaHoraria)` and injected, and dates come out of SQL via `DATE_FORMAT` to dodge the mysql2 `DATE` trap. `/superadmin/estadisticas/:id` accepts digits only: MySQL compares `id = '5abc'` as `5`.
+
 ### The landing — the root of the domain
 
 `GET /` is the **platform's** page, not a tenant's: `views/landing.ejs`, which sells the service to businesses that are not customers yet. Subdomains are intercepted before it, and `getSubdomain` excludes `www`, so `www.enelmapa.co` lands here too.
@@ -209,7 +229,7 @@ Two constraints worth knowing before writing one:
 
 `001_initial.sql` is the schema frozen at the point migrations were introduced, written with `IF NOT EXISTS` so it is a no-op against the production database that already had those tables.
 
-Core tables: `businesses` (1 per tenant, has `slug`, contact/social fields, `is_open`, `menu_theme`/`menu_template`/`menu_scale`, `promos_enabled`, `promo_flyer`) → `business_hours` (7 rows/business), `categories` → `products` (with the `promo_*` columns), and `users` (admin logins, one business each via `business_id` FK), plus `schema_migrations` and `sessions`. All tenant-scoped queries filter by `business_id`.
+Core tables: `businesses` (1 per tenant, has `slug`, contact/social fields, `is_open`, `menu_theme`/`menu_template`/`menu_scale`, `promos_enabled`, `promo_flyer`) → `business_hours` (7 rows/business), `categories` → `products` (with the `promo_*` columns), and `users` (admin logins, one business each via `business_id` FK), plus `menu_events` (statistics), `schema_migrations` and `sessions`. All tenant-scoped queries filter by `business_id`.
 
 **Adding a column to `businesses` means touching THREE places**, and missing any one makes the save return `200` without saving that field:
 

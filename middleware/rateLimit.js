@@ -45,4 +45,23 @@ function createLoginLimiter({ windowMs, max, mensaje }) {
   });
 }
 
-module.exports = { createLoginLimiter };
+// Freno para el beacon de estadísticas del menú (routes/eventos.js). A
+// diferencia de los logins, acá cuentan TODAS las requests: no hay intento
+// "fallido" que distinguir, lo que se frena es el volumen. No pretende parar a
+// un atacante decidido a inflar números —es un contador de marketing, no un
+// dato contable— sino a un script que dispare miles de eventos por minuto.
+function createEventLimiter({ max }) {
+  if (!max || max <= 0) {
+    return (req, res, next) => next();
+  }
+
+  return rateLimit({
+    windowMs: 60 * 1000,
+    limit: max,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    handler: (req, res, next) => next(new TooManyRequestsError('Demasiados eventos.'))
+  });
+}
+
+module.exports = { createLoginLimiter, createEventLimiter };

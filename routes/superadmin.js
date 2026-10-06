@@ -7,6 +7,7 @@ const { verifySuperadmin } = require('../services/superadminAuth');
 const { NotFoundError } = require('../errors');
 const validate = require('../middleware/validate');
 const { schemas } = require('../validators');
+const estadisticas = require('../services/estadisticas');
 
 // Este router es el único que usa `repos.businesses.platform`, la superficie
 // que cruza negocios a propósito: el superadmin puede crear, editar y borrar
@@ -87,6 +88,34 @@ function createSuperadminRouter({ repos, services, config }) {
   router.get('/', superRequired, asyncHandler(async (req, res) => {
     const businesses = await repos.businesses.platform.listWithCounts();
     res.render('superadmin/dashboard', { businesses });
+  }));
+
+  // Estadísticas de toda la plataforma: una fila por negocio, ordenadas por
+  // visitas del mes. Es la vista que cruza negocios a propósito
+  // (`repos.events.platform`), igual que el listado de arriba.
+  router.get('/estadisticas', superRequired, asyncHandler(async (req, res) => {
+    const resumen = await services.tablero.plataforma({
+      hoy: estadisticas.momentoEn(config.zonaHoraria).dia
+    });
+    res.render('superadmin/estadisticas', { resumen });
+  }));
+
+  // El tablero de UN negocio: la misma función y el mismo partial que ve su
+  // dueño. 404 si el id no existe, en vez de redirigir como /edit: acá no hay
+  // formulario que salvar, y un 404 deja claro que el link estaba mal.
+  router.get('/estadisticas/:id', superRequired, asyncHandler(async (req, res) => {
+    // Sólo dígitos: MySQL compara `id = '5abc'` convirtiendo el texto a 5, así
+    // que sin esto un id mal escrito abriría el tablero de otro negocio.
+    const business = /^\d+$/.test(req.params.id)
+      ? await repos.businesses.platform.findById(Number(req.params.id))
+      : null;
+    if (!business) throw new NotFoundError('Negocio no encontrado');
+
+    const tablero = await services.tablero.deNegocio(business.id, {
+      dias: req.query.dias,
+      hoy: estadisticas.momentoEn(config.zonaHoraria).dia
+    });
+    res.render('superadmin/estadisticas-negocio', { business, tablero });
   }));
 
   router.get('/create', superRequired, (req, res) => {

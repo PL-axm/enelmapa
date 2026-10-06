@@ -25,11 +25,22 @@ describe('qrService', () => {
   // Los dos consumidores necesitan la URL y el PNG juntos: el panel muestra la
   // URL debajo del código y el JSON la usa para el botón de descarga. Que salgan
   // de la misma llamada es lo que impide que uno arme una y el otro otra.
-  test('el PNG codifica exactamente la URL que devuelve', async () => {
-    const { url, dataUrl } = await qr.forSlug('el-silvestre-cm');
+  test('el PNG codifica la URL del menú con la marca de origen QR', async () => {
+    const { url, urlQr, dataUrl } = await qr.forSlug('el-silvestre-cm');
 
-    expect(url).toContain('el-silvestre-cm');
-    expect(dataUrl.length).toBeGreaterThan(100);
+    expect(url).toBe('https://enelmapa.co/s/el-silvestre-cm');
+    expect(urlQr).toBe(url + '?o=qr');
+
+    const QRCode = require('qrcode');
+    const esperado = await QRCode.toDataURL(urlQr, { margin: 2, color: { dark: '#1A1A18', light: '#FFFFFF' }, width: qrService.TAMAÑO_POR_DEFECTO });
+    expect(dataUrl).toBe(esperado);
+  });
+
+  // La URL que el dueño lee y copia queda SIN el parámetro: si lo llevara, lo
+  // que comparta en Instagram contaría como visita por QR.
+  test('la URL para mostrar no lleva la marca de QR', async () => {
+    const { url } = await qr.forSlug('x');
+    expect(url).not.toContain('o=qr');
   });
 
   test('un tamaño mayor produce una imagen mayor', async () => {

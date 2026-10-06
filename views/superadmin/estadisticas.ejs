@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estadísticas - Super Admin EnElMapa</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}
+.topbar{background:#16213e;padding:16px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2a4a;gap:12px}
+.topbar h1{color:#e94560;font-size:20px}
+.topbar a{color:#8a8a9a;text-decoration:none;font-size:13px}
+.topbar a:hover{color:#e94560}
+.container{max-width:1100px;margin:30px auto;padding:0 20px}
+h2{font-size:18px;color:#ccc;margin-bottom:6px}
+.sub{font-size:13px;color:#8a8a9a;margin-bottom:20px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+.kpi{background:#16213e;border:1px solid #2a2a4a;border-radius:10px;padding:16px 18px}
+.kpi-num{font-size:26px;font-weight:700;color:#e94560;font-variant-numeric:tabular-nums}
+.kpi-label{font-size:13px;color:#8a8a9a;margin-top:4px}
+.card{background:#16213e;border-radius:10px;overflow-x:auto;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th{text-align:left;padding:14px 16px;font-size:12px;text-transform:uppercase;color:#8a8a9a;background:#0f3460;letter-spacing:.5px}
+th.num,td.num{text-align:right}
+td{padding:12px 16px;border-top:1px solid #2a2a4a;font-size:14px;font-variant-numeric:tabular-nums}
+td a{color:#e0e0e0;text-decoration:none}
+td a:hover{color:#e94560}
+.slug{color:#8a8a9a;font-size:12px}
+.sube{color:#4cd07d}.baja{color:#ff6b6b}.neutra{color:#8a8a9a}
+tr.muerto td{color:#6a6a7a}
+.btn{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block;background:#2a2a4a;color:#ccc}
+.btn:hover{background:#e94560;color:#fff}
+@media (max-width:600px){.topbar{padding:14px 16px}.container{padding:0 16px;margin-top:20px}}
+</style>
+</head>
+<body>
+<%
+  const fmtNum = (x) => Number(x).toLocaleString('es-CO');
+  const fmtDia = (d) => d.slice(8, 10) + '/' + d.slice(5, 7);
+%>
+<div class="topbar">
+  <h1>EnElMapa — Estadísticas</h1>
+  <a href="/superadmin">← Negocios</a>
+</div>
+
+<div class="container">
+  <h2>Uso de los menús</h2>
+  <p class="sub">Últimos 30 días (<%= fmtDia(resumen.periodo.desde) %> al <%= fmtDia(resumen.periodo.hasta) %>), comparados con los 30 anteriores. Ordenado por visitas.</p>
+
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-num"><%= fmtNum(resumen.totales.visitas30) %></div><div class="kpi-label">Visitas en 30 días, todos los menús</div></div>
+    <div class="kpi"><div class="kpi-num"><%= fmtNum(resumen.totales.visitas7) %></div><div class="kpi-label">Visitas en los últimos 7 días</div></div>
+    <div class="kpi"><div class="kpi-num"><%= fmtNum(resumen.totales.whatsapp30) %></div><div class="kpi-label">Clics a WhatsApp en 30 días</div></div>
+    <div class="kpi"><div class="kpi-num"><%= resumen.activos %> / <%= resumen.negocios.length %></div><div class="kpi-label">Menús con al menos una visita</div></div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Negocio</th>
+          <th class="num">7 días</th>
+          <th class="num">30 días</th>
+          <th class="num">vs. 30 anteriores</th>
+          <th class="num">Visitantes</th>
+          <th class="num">WhatsApp</th>
+          <th class="num">Tasa de clic</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (resumen.negocios.length === 0) { %>
+          <tr><td colspan="8" style="text-align:center;padding:40px;color:#8a8a9a">No hay negocios registrados</td></tr>
+        <% } %>
+        <% resumen.negocios.forEach(n => { %>
+          <tr class="<%= n.visitas30 === 0 ? 'muerto' : '' %>">
+            <td><a href="/superadmin/estadisticas/<%= n.id %>"><strong><%= n.name %></strong></a><br><span class="slug"><%= n.slug %></span></td>
+            <td class="num"><%= fmtNum(n.visitas7) %></td>
+            <td class="num"><%= fmtNum(n.visitas30) %></td>
+            <td class="num">
+              <% if (n.variacion === null) { %><span class="neutra">—</span>
+              <% } else { %><span class="<%= n.variacion > 0 ? 'sube' : n.variacion < 0 ? 'baja' : 'neutra' %>"><%= n.variacion > 0 ? '▲ +' : n.variacion < 0 ? '▼ ' : '' %><%= n.variacion %>%</span><% } %>
+            </td>
+            <td class="num"><%= fmtNum(n.visitantes30) %></td>
+            <td class="num"><%= fmtNum(n.whatsapp30) %></td>
+            <td class="num"><%= String(n.tasaClic).replace('.', ',') %>%</td>
+            <td class="num"><a class="btn" href="/superadmin/estadisticas/<%= n.id %>">Ver</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>
