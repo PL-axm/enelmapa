@@ -168,6 +168,10 @@ Decisions live in `services/estadisticas.js` (pure):
 
 `menu_events.product_id` has **no FK on purpose**: deleted products keep their history. Reads must JOIN `products` scoped by business, which also makes a foreign `product_id` sent by hand invisible.
 
+**The dashboards.** `/admin/estadisticas` (the owner, scoped by session — no id in the URL), `/superadmin/estadisticas` (one row per business, `repos.events.platform.resumenPorNegocio`, a `LEFT JOIN` so businesses with zero visits still show) and `/superadmin/estadisticas/:id`. The owner's page and the superadmin's per-business page render **the same partial**, `views/partials/estadisticas.ejs`, from the same `services.tablero.deNegocio` — so they can't drift. The partial takes its colours from CSS variables (`--est-*-x`) that the host page sets: the owner panel is light, the superadmin dark.
+
+The view computes nothing: `estadisticas.armarTablero` (pure) hands it bar heights, percentages and the zero-filled days; `services/tableroService.js` runs the queries. Charts are server-side SVG, no library — there's no bundler and no CDN in this project. Ranges are 7/30/90 days (`rangoValido`; anything else falls back to 30), "today" is computed in the router with `momentoEn(config.zonaHoraria)` and injected, and dates come out of SQL via `DATE_FORMAT` to dodge the mysql2 `DATE` trap. `/superadmin/estadisticas/:id` accepts digits only: MySQL compares `id = '5abc'` as `5`.
+
 ### The landing — the root of the domain
 
 `GET /` is the **platform's** page, not a tenant's: `views/landing.ejs`, which sells the service to businesses that are not customers yet. Subdomains are intercepted before it, and `getSubdomain` excludes `www`, so `www.enelmapa.co` lands here too.

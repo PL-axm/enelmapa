@@ -3,7 +3,8 @@
 Aprobado el 2026-10-06. Rama `feature/estadisticas-visitas` (desde `main` en
 `8d1c8b4`).
 
-**Estado:** fase 1 (recolección) terminada en la rama; fases 2 y 3 pendientes.
+**Estado:** las tres fases están terminadas en la rama y se mergean juntas,
+a pedido del usuario.
 
 Es **team mode**: agrega una tabla, un endpoint público sin sesión y código que
 corre en el menú de **todos** los negocios a la vez.
@@ -257,6 +258,18 @@ Cada fase en su propia rama, mergeable sola, con `npm test` en verde y
 - **Origen:** si no hay referrer, se usa el user-agent del navegador interno de
   Instagram o Facebook. Se suma `enelmapa` como origen para las visitas que
   llegan desde la landing.
+
+## Ajustes al implementar las fases 2 y 3
+
+- **Las tres fases van en la misma rama**, con un commit por fase, y se
+  mergean juntas al final a pedido del usuario. No hubo una rama por fase.
+- **"Productos abiertos" tiene su propia tarjeta**, además de aparecer en el
+  top.
+- **Superadmin:** un id con algo que no sea dígitos devuelve 404. MySQL
+  compara `id = '5abc'` como `5`, así que sin esa guarda se abriría el
+  tablero de otro negocio.
+- **La nota sobre los QR viejos** no lleva fecha: el tablero no sabe cuándo se
+  desplegó.
 
 ## Fuera de alcance, y limitaciones que hay que saber
 

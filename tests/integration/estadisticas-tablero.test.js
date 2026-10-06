@@ -2,7 +2,7 @@ const request = require('supertest');
 const { createTestApp, getTestRepos, getTestContainer } = require('../helpers/container');
 const { resetDb, closeDb } = require('../helpers/db');
 const { createTwoBusinesses } = require('../helpers/fixtures');
-const { loginAdmin } = require('../helpers/sesion');
+const { loginAdmin, loginSuperadmin } = require('../helpers/sesion');
 const estadisticas = require('../../services/estadisticas');
 
 const app = createTestApp();
@@ -216,5 +216,95 @@ describe('tablero del dueño: /admin/estadisticas', () => {
     const res = await admin.get('/admin/dashboard');
     expect(res.text).toMatch(/<div class="stat-num">4<\/div>\s*<div class="stat-label">Visitas al menú, últimos 7 días/);
     expect(res.text).toContain('href="/admin/estadisticas"');
+  });
+});
+
+describe('tablero del superadmin: /superadmin/estadisticas', () => {
+  let businessA;
+  let businessB;
+
+  beforeEach(async () => {
+    await resetDb();
+    ({ businessA, businessB } = await createTwoBusinesses());
+  });
+
+  test('sin sesión de superadmin no se ve, ni el listado ni el de un negocio', async () => {
+    for (const url of ['/superadmin/estadisticas', '/superadmin/estadisticas/' + businessA.businessId]) {
+      const res = await request(app).get(url);
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toMatch(/\/superadmin\/login/);
+    }
+  });
+
+  // Una sesión de dueño NO es una de superadmin: son reinos separados.
+  test('un dueño logueado no entra', async () => {
+    const admin = await loginAdmin(app, { email: businessA.adminEmail, password: businessA.adminPassword });
+    const res = await admin.get('/superadmin/estadisticas/' + businessB.businessId);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toMatch(/\/superadmin\/login/);
+  });
+
+  test('el listado trae todos los negocios, ordenados por visitas, también los que no tienen', async () => {
+    await sembrar(businessB.businessId, [...visitas(5), { tipo: 'whatsapp' }]);
+    await sembrar(businessA.businessId, visitas(2));
+
+    const superadmin = await loginSuperadmin(app);
+    const res = await superadmin.get('/superadmin/estadisticas');
+    expect(res.status).toBe(200);
+
+    const posA = res.text.indexOf(businessA.name);
+    const posB = res.text.indexOf(businessB.name);
+    expect(posA).toBeGreaterThan(-1);
+    expect(posB).toBeGreaterThan(-1);
+    expect(posB).toBeLessThan(posA);
+    expect(res.text).toContain('2 / 2');
+  });
+
+  test('el servicio de plataforma calcula totales y variación', async () => {
+    const ayer40 = estadisticas.sumarDias(hoy(), -40);
+    await sembrar(businessA.businessId, [...visitas(6), ...visitas(3, { dia: ayer40 }), { tipo: 'whatsapp' }]);
+
+    const r = await getTestContainer().services.tablero.plataforma({ hoy: hoy() });
+    const a = r.negocios.find(n => n.id === businessA.businessId);
+    const b = r.negocios.find(n => n.id === businessB.businessId);
+
+    expect(a).toMatchObject({ visitas7: 6, visitas30: 6, whatsapp30: 1, variacion: 100 });
+    expect(a.tasaClic).toBeCloseTo(16.7);
+    expect(b).toMatchObject({ visitas30: 0, variacion: null });
+    expect(r.totales).toEqual({ visitas7: 6, visitas30: 6, whatsapp30: 1 });
+    expect(r.activos).toBe(1);
+    expect(r.negocios[0].id).toBe(businessA.businessId);
+  });
+
+  test('el tablero de un negocio es el mismo que ve su dueño', async () => {
+    await sembrar(businessB.businessId, [...visitas(3), { tipo: 'producto', productId: businessB.productId }]);
+
+    const superadmin = await loginSuperadmin(app);
+    const res = await superadmin.get('/superadmin/estadisticas/' + businessB.businessId + '?dias=7');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain(businessB.name + ' producto');
+    expect(res.text).not.toContain(businessA.name + ' producto');
+    expect(res.text).toMatch(new RegExp('href="/superadmin/estadisticas/' + businessB.businessId + '\\?dias=7" class="activo"'));
+  });
+
+  test('un id inexistente es 404', async () => {
+    const superadmin = await loginSuperadmin(app);
+    const res = await superadmin.get('/superadmin/estadisticas/999999');
+    expect(res.status).toBe(404);
+  });
+
+  // MySQL compara `id = '5abc'` convirtiendo el texto a 5: sin la guarda, un
+  // id mal escrito abriría el tablero de otro negocio.
+  test('un id con basura no se convierte en otro negocio', async () => {
+    const superadmin = await loginSuperadmin(app);
+    const res = await superadmin.get('/superadmin/estadisticas/' + businessA.businessId + 'abc');
+    expect(res.status).toBe(404);
+  });
+
+  test('el listado de negocios enlaza a las estadísticas', async () => {
+    const superadmin = await loginSuperadmin(app);
+    const res = await superadmin.get('/superadmin');
+    expect(res.text).toContain('href="/superadmin/estadisticas"');
+    expect(res.text).toContain('href="/superadmin/estadisticas/' + businessA.businessId + '"');
   });
 });

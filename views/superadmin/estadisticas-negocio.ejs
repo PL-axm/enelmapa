@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= business.name %> · Estadísticas - Super Admin EnElMapa</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}
+.topbar{background:#16213e;padding:16px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2a4a;gap:12px}
+.topbar h1{color:#e94560;font-size:20px}
+.topbar a{color:#8a8a9a;text-decoration:none;font-size:13px}
+.topbar a:hover{color:#e94560}
+.container{max-width:1100px;margin:30px auto;padding:0 20px}
+.cabecera{margin-bottom:20px}
+.cabecera h2{font-size:20px;color:#e0e0e0}
+.cabecera a{color:#8a8a9a;font-size:13px;text-decoration:none}
+.cabecera a:hover{color:#e94560}
+/* Los colores del tablero compartido (views/partials/estadisticas.ejs), en
+   la paleta oscura del superadmin. */
+.est{--est-superficie-x:#16213e;--est-texto-x:#e0e0e0;--est-suave-x:#8a8a9a;--est-borde-x:#2a2a4a;--est-acento-x:#e94560;--est-pista-x:#232c4d;--est-sube-x:#4cd07d;--est-baja-x:#ff6b6b}
+@media (max-width:600px){.topbar{padding:14px 16px}.container{padding:0 16px;margin-top:20px}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>EnElMapa — Estadísticas</h1>
+  <a href="/superadmin/estadisticas">← Todos los negocios</a>
+</div>
+
+<div class="container">
+  <div class="cabecera">
+    <h2><%= business.name %></h2>
+    <a href="/s/<%= business.slug %>" target="_blank"><%= business.slug %>.enelmapa.co ↗</a>
+  </div>
+
+  <%- include('../partials/estadisticas', { tablero, urlBase: '/superadmin/estadisticas/' + business.id }) %>
+</div>
+</body>
+</html>
