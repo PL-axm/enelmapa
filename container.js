@@ -14,6 +14,7 @@ const locationService = require('./services/locationService');
 const productImageService = require('./services/productImageService');
 const qrService = require('./services/qrService');
 const menuService = require('./services/menuService');
+const tableroService = require('./services/tableroService');
 const { createLogger } = require('./services/logger');
 
 // Composition root: el ÚNICO lugar del código que construye dependencias.
@@ -86,7 +87,8 @@ function createContainer(config) {
     menu: menuService(),
     businesses: businessService({ repos, withTransaction, auth }),
     locations: locationService({ withTransaction }),
-    productImages: productImageService({ withTransaction, logger })
+    productImages: productImageService({ withTransaction, logger }),
+    tablero: tableroService({ repos })
   };
 
   return {

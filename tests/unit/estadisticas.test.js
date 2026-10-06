@@ -126,3 +126,94 @@ describe('estadisticas.huellaVisitante', () => {
     expect(a).not.toBe(b);
   });
 });
+
+describe('estadisticas: armado del tablero', () => {
+  test('rangoValido acepta 7, 30 y 90, y cualquier otra cosa cae a 30', () => {
+    expect(estadisticas.rangoValido('7')).toBe(7);
+    expect(estadisticas.rangoValido(90)).toBe(90);
+    expect(estadisticas.rangoValido('100000')).toBe(30);
+    expect(estadisticas.rangoValido(undefined)).toBe(30);
+    expect(estadisticas.rangoValido('abc')).toBe(30);
+  });
+
+  test('sumarDias cruza meses y años', () => {
+    expect(estadisticas.sumarDias('2026-10-01', -1)).toBe('2026-09-30');
+    expect(estadisticas.sumarDias('2026-12-31', 1)).toBe('2027-01-01');
+    expect(estadisticas.sumarDias('2028-02-28', 1)).toBe('2028-02-29');
+  });
+
+  // "Últimos 7 días" incluye hoy, y el período anterior es el bloque de 7
+  // inmediatamente antes, sin solaparse ni dejar un hueco.
+  test('periodos: el actual incluye hoy y el anterior es contiguo', () => {
+    expect(estadisticas.periodos('2026-10-06', 7)).toEqual({
+      actual: { desde: '2026-09-30', hasta: '2026-10-06' },
+      anterior: { desde: '2026-09-23', hasta: '2026-09-29' }
+    });
+  });
+
+  test('completarDias rellena con ceros los días sin visitas', () => {
+    const dias = estadisticas.completarDias(
+      [{ dia: '2026-10-02', visitas: 5, visitantes: 3 }],
+      '2026-10-01', '2026-10-03'
+    );
+    expect(dias).toEqual([
+      { dia: '2026-10-01', visitas: 0, visitantes: 0 },
+      { dia: '2026-10-02', visitas: 5, visitantes: 3 },
+      { dia: '2026-10-03', visitas: 0, visitantes: 0 }
+    ]);
+  });
+
+  test('completarHoras da siempre 24 horas', () => {
+    const horas = estadisticas.completarHoras([{ hora: 13, visitas: 4 }]);
+    expect(horas).toHaveLength(24);
+    expect(horas[13]).toEqual({ hora: 13, visitas: 4 });
+    expect(horas[0]).toEqual({ hora: 0, visitas: 0 });
+  });
+
+  test('variacion: null sin base, y el porcentaje redondeado con ella', () => {
+    expect(estadisticas.variacion(10, 0)).toBeNull();
+    expect(estadisticas.variacion(15, 10)).toBe(50);
+    expect(estadisticas.variacion(5, 10)).toBe(-50);
+    expect(estadisticas.variacion(10, 10)).toBe(0);
+  });
+
+  test('armarTablero normaliza alturas y porcentajes para la vista', () => {
+    const resumen = { visitas: 10, visitantes: 6, productos: 4, whatsapp: 2, instagram: 1, facebook: 1 };
+    const t = estadisticas.armarTablero({
+      dias: 7,
+      periodo: { desde: '2026-09-30', hasta: '2026-10-06' },
+      resumen,
+      resumenAnterior: { visitas: 5, visitantes: 0, productos: 4, whatsapp: 1, instagram: 0, facebook: 0 },
+      porDia: [{ dia: '2026-10-06', visitas: 10, visitantes: 6 }],
+      porHora: [{ hora: 20, visitas: 10 }],
+      topProductos: [{ id: 1, name: 'Tinto', vistas: 4 }, { id: 2, name: 'Pan', vistas: 2 }],
+      origenes: [{ origen: 'directo', visitas: 3 }, { origen: 'qr', visitas: 7 }]
+    });
+
+    expect(t.vacio).toBe(false);
+    expect(t.kpis.visitas).toEqual({ valor: 10, variacion: 100 });
+    expect(t.kpis.visitantes.variacion).toBeNull();
+    expect(t.kpis.tasaClic).toBe(20);
+    expect(t.serie).toHaveLength(7);
+    expect(t.serie[6].alto).toBe(1);
+    expect(t.horas[20].alto).toBe(1);
+    expect(t.topProductos.map(p => p.ancho)).toEqual([1, 0.5]);
+    // Ordenados de mayor a menor, con etiqueta legible.
+    expect(t.origenes[0]).toEqual({ origen: 'qr', etiqueta: 'Código QR', visitas: 7, porcentaje: 70 });
+    expect(t.clics.find(c => c.red === 'WhatsApp').porcentaje).toBe(50);
+  });
+
+  test('armarTablero sin visitas queda vacío y sin dividir por cero', () => {
+    const cero = { visitas: 0, visitantes: 0, productos: 0, whatsapp: 0, instagram: 0, facebook: 0 };
+    const t = estadisticas.armarTablero({
+      dias: 30,
+      periodo: { desde: '2026-09-07', hasta: '2026-10-06' },
+      resumen: cero, resumenAnterior: cero,
+      porDia: [], porHora: [], topProductos: [], origenes: []
+    });
+    expect(t.vacio).toBe(true);
+    expect(t.kpis.tasaClic).toBe(0);
+    expect(t.serie).toHaveLength(30);
+    expect(t.serie.every(d => d.alto === 0)).toBe(true);
+  });
+});

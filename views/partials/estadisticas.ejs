@@ -1,0 +1,196 @@
+<%#
+  Tablero de estadísticas de UN negocio. Lo incluyen el panel del dueño
+  (views/admin/estadisticas.ejs) y el superadmin
+  (views/superadmin/estadisticas-negocio.ejs): una sola vista para que los dos
+  vean exactamente lo mismo y no haya dos versiones que se desincronicen.
+
+  Recibe:
+    tablero  — lo que arma services/estadisticas.js#armarTablero. La vista no
+               calcula nada: alturas y porcentajes vienen hechos.
+    urlBase  — a dónde apuntan los botones de rango (?dias=).
+
+  Los colores salen de variables CSS que define la página que lo incluye: el
+  panel del dueño es claro y el del superadmin oscuro. Los valores de acá son
+  los del panel del dueño, por si una página no define ninguno.
+
+  Los gráficos son SVG armado en el servidor, sin librería: el proyecto no
+  tiene bundler ni usa CDNs, y unas barras no justifican sumar Chart.js. Así
+  el tablero se ve completo aunque el navegador no ejecute JS.
+%>
+<%
+  const fmtDia = (d) => d.slice(8, 10) + '/' + d.slice(5, 7);
+  const fmtNum = (x) => Number(x).toLocaleString('es-CO');
+  const k = tablero.kpis;
+%>
+<style>
+  .est { --est-superficie: var(--est-superficie-x, #fff); --est-texto: var(--est-texto-x, #1A1A18); --est-suave: var(--est-suave-x, #6B6860); --est-borde: var(--est-borde-x, #E8E5DE); --est-acento: var(--est-acento-x, #C8956C); --est-pista: var(--est-pista-x, #F2EFEA); --est-sube: var(--est-sube-x, #1E8449); --est-baja: var(--est-baja-x, #C0392B); color: var(--est-texto); }
+  .est-barra-rangos { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .est-periodo { font-size: 13px; color: var(--est-suave); }
+  .est-rangos { display: inline-flex; border: 1px solid var(--est-borde); border-radius: 8px; overflow: hidden; }
+  .est-rangos a { padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--est-suave); text-decoration: none; background: var(--est-superficie); }
+  .est-rangos a + a { border-left: 1px solid var(--est-borde); }
+  .est-rangos a.activo { background: var(--est-acento); color: #fff; }
+  .est-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .est-kpi { background: var(--est-superficie); border: 1px solid var(--est-borde); border-radius: 10px; padding: 16px 18px; }
+  .est-kpi-num { font-size: 28px; font-weight: 700; color: var(--est-acento); line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .est-kpi-label { font-size: 13px; color: var(--est-suave); margin-top: 4px; }
+  .est-var { font-size: 12px; font-weight: 600; margin-top: 6px; }
+  .est-var.sube { color: var(--est-sube); }
+  .est-var.baja { color: var(--est-baja); }
+  .est-var.neutra { color: var(--est-suave); font-weight: 400; }
+  .est-card { background: var(--est-superficie); border: 1px solid var(--est-borde); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  .est-card h3 { font-size: 15px; margin-bottom: 4px; }
+  .est-card .est-sub { font-size: 12.5px; color: var(--est-suave); margin-bottom: 16px; }
+  .est-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .est-dos .est-card { margin-bottom: 0; }
+  .est-grafico { display: block; width: 100%; height: 160px; }
+  .est-grafico rect { fill: var(--est-acento); }
+  .est-grafico rect.cero { fill: var(--est-pista); }
+  .est-grafico rect:hover { opacity: 0.75; }
+  .est-eje { display: flex; justify-content: space-between; font-size: 11px; color: var(--est-suave); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .est-lista { list-style: none; padding: 0; margin: 0; }
+  .est-lista li { margin-bottom: 12px; }
+  .est-lista li:last-child { margin-bottom: 0; }
+  .est-fila { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; margin-bottom: 5px; }
+  .est-fila .nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .est-fila .valor { color: var(--est-suave); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .est-pista { height: 8px; border-radius: 4px; background: var(--est-pista); overflow: hidden; }
+  .est-pista span { display: block; height: 100%; border-radius: 4px; background: var(--est-acento); }
+  .est-vacio { text-align: center; padding: 28px 16px; color: var(--est-suave); font-size: 14px; }
+  .est-vacio strong { display: block; color: var(--est-texto); font-size: 15px; margin-bottom: 6px; }
+  .est-nota { font-size: 12px; color: var(--est-suave); margin-top: 14px; line-height: 1.45; }
+  @media (max-width: 768px) {
+    .est-dos { grid-template-columns: 1fr; }
+    .est-dos .est-card { margin-bottom: 20px; }
+    .est-grafico { height: 120px; }
+    .est-kpi-num { font-size: 24px; }
+  }
+</style>
+
+<div class="est">
+  <div class="est-barra-rangos">
+    <div class="est-periodo">Del <%= fmtDia(tablero.periodo.desde) %> al <%= fmtDia(tablero.periodo.hasta) %> · comparado con los <%= tablero.dias %> días anteriores</div>
+    <nav class="est-rangos" aria-label="Rango de fechas">
+      <% tablero.rangos.forEach(r => { %>
+        <a href="<%= urlBase %>?dias=<%= r %>" class="<%= r === tablero.dias ? 'activo' : '' %>"><%= r %> días</a>
+      <% }) %>
+    </nav>
+  </div>
+
+  <%
+    const variacionHtml = (v) => v === null
+      ? '<div class="est-var neutra">sin datos para comparar</div>'
+      : '<div class="est-var ' + (v > 0 ? 'sube' : v < 0 ? 'baja' : 'neutra') + '">' +
+        (v > 0 ? '▲ +' : v < 0 ? '▼ ' : '= ') + v + '% vs. período anterior</div>';
+  %>
+  <div class="est-kpis">
+    <div class="est-kpi">
+      <div class="est-kpi-num"><%= fmtNum(k.visitas.valor) %></div>
+      <div class="est-kpi-label">Visitas al menú</div>
+      <%- variacionHtml(k.visitas.variacion) %>
+    </div>
+    <div class="est-kpi">
+      <div class="est-kpi-num"><%= fmtNum(k.visitantes.valor) %></div>
+      <div class="est-kpi-label">Visitantes (únicos por día)</div>
+      <%- variacionHtml(k.visitantes.variacion) %>
+    </div>
+    <div class="est-kpi">
+      <div class="est-kpi-num"><%= fmtNum(k.productos.valor) %></div>
+      <div class="est-kpi-label">Productos abiertos</div>
+      <%- variacionHtml(k.productos.variacion) %>
+    </div>
+    <div class="est-kpi">
+      <div class="est-kpi-num"><%= fmtNum(k.whatsapp.valor) %></div>
+      <div class="est-kpi-label">Clics a WhatsApp</div>
+      <%- variacionHtml(k.whatsapp.variacion) %>
+    </div>
+    <div class="est-kpi">
+      <div class="est-kpi-num"><%= String(k.tasaClic).replace('.', ',') %>%</div>
+      <div class="est-kpi-label">Visitas que escriben por WhatsApp</div>
+    </div>
+  </div>
+
+  <% if (tablero.vacio) { %>
+    <div class="est-card">
+      <div class="est-vacio">
+        <strong>Todavía no hay visitas en este período</strong>
+        Las visitas se cuentan cuando alguien abre el menú desde su celular. Comparte el link o el QR y vuelve en unos días.
+      </div>
+    </div>
+  <% } else { %>
+
+  <div class="est-card">
+    <h3>Visitas por día</h3>
+    <div class="est-sub">Cuántas veces se abrió el menú cada día.</div>
+    <% const anchoBarra = 10; %>
+    <svg class="est-grafico" viewBox="0 0 <%= tablero.serie.length * anchoBarra %> 100" preserveAspectRatio="none" role="img" aria-label="Visitas por día">
+      <% tablero.serie.forEach((d, i) => { const alto = d.visitas ? Math.max(d.alto * 98, 2) : 1.5; %>
+        <rect x="<%= i * anchoBarra + 1.5 %>" y="<%= 100 - alto %>" width="<%= anchoBarra - 3 %>" height="<%= alto %>" class="<%= d.visitas ? '' : 'cero' %>"><title><%= fmtDia(d.dia) %>: <%= d.visitas %> visitas, <%= d.visitantes %> visitantes</title></rect>
+      <% }) %>
+    </svg>
+    <div class="est-eje">
+      <span><%= fmtDia(tablero.serie[0].dia) %></span>
+      <span><%= fmtDia(tablero.serie[Math.floor(tablero.serie.length / 2)].dia) %></span>
+      <span><%= fmtDia(tablero.serie[tablero.serie.length - 1].dia) %></span>
+    </div>
+  </div>
+
+  <div class="est-card">
+    <h3>¿A qué hora miran el menú?</h3>
+    <div class="est-sub">Visitas según la hora del día, sumando todo el período.</div>
+    <svg class="est-grafico" viewBox="0 0 240 100" preserveAspectRatio="none" role="img" aria-label="Visitas por hora del día">
+      <% tablero.horas.forEach((h) => { const alto = h.visitas ? Math.max(h.alto * 98, 2) : 1.5; %>
+        <rect x="<%= h.hora * 10 + 1.5 %>" y="<%= 100 - alto %>" width="7" height="<%= alto %>" class="<%= h.visitas ? '' : 'cero' %>"><title><%= h.hora %>:00 a <%= h.hora %>:59 — <%= h.visitas %> visitas</title></rect>
+      <% }) %>
+    </svg>
+    <div class="est-eje"><span>12 a. m.</span><span>6 a. m.</span><span>12 m.</span><span>6 p. m.</span><span>11 p. m.</span></div>
+  </div>
+
+  <div class="est-dos">
+    <div class="est-card">
+      <h3>Productos más vistos</h3>
+      <div class="est-sub">Cuántas veces se abrió el detalle de cada producto.</div>
+      <% if (tablero.topProductos.length === 0) { %>
+        <div class="est-vacio">Nadie abrió un producto en este período.</div>
+      <% } else { %>
+        <ol class="est-lista">
+          <% tablero.topProductos.forEach(p => { %>
+            <li>
+              <div class="est-fila"><span class="nombre"><%= p.name %></span><span class="valor"><%= fmtNum(p.vistas) %></span></div>
+              <div class="est-pista"><span style="width:<%= (p.ancho * 100).toFixed(1) %>%"></span></div>
+            </li>
+          <% }) %>
+        </ol>
+      <% } %>
+    </div>
+
+    <div class="est-card">
+      <h3>¿De dónde llegan?</h3>
+      <div class="est-sub">Origen de cada visita.</div>
+      <ul class="est-lista">
+        <% tablero.origenes.forEach(o => { %>
+          <li>
+            <div class="est-fila"><span class="nombre"><%= o.etiqueta %></span><span class="valor"><%= fmtNum(o.visitas) %> · <%= String(o.porcentaje).replace('.', ',') %>%</span></div>
+            <div class="est-pista"><span style="width:<%= o.porcentaje %>%"></span></div>
+          </li>
+        <% }) %>
+      </ul>
+      <p class="est-nota">Los QR impresos antes de que existieran estas estadísticas no identifican el escaneo y cuentan como "Directo". Para medirlos, descarga el QR de nuevo y reimprímelo.</p>
+    </div>
+  </div>
+
+  <div class="est-card" style="margin-top:20px">
+    <h3>Clics a redes</h3>
+    <div class="est-sub">Visitantes que tocaron los botones de contacto del menú.</div>
+    <ul class="est-lista">
+      <% tablero.clics.forEach(c => { %>
+        <li>
+          <div class="est-fila"><span class="nombre"><%= c.red %></span><span class="valor"><%= fmtNum(c.clics) %></span></div>
+          <div class="est-pista"><span style="width:<%= c.porcentaje %>%"></span></div>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+
+  <% } %>
+</div>

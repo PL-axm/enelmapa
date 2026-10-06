@@ -1,6 +1,10 @@
 <%- include('../partials/admin-head', { title: 'Dashboard', session }) %>
 
 <div class="stat-grid">
+  <a class="stat-card" href="/admin/estadisticas" style="text-decoration:none;color:inherit">
+    <div class="stat-num"><%= stats.visitas7.toLocaleString('es-CO') %></div>
+    <div class="stat-label">Visitas al menú, últimos 7 días · <span style="color:#C8956C;font-weight:600">ver estadísticas →</span></div>
+  </a>
   <div class="stat-card">
     <div class="stat-num"><%= stats.categories %></div>
     <div class="stat-label">Categorías</div>
